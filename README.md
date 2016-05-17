@@ -70,12 +70,19 @@ foreach($myTable in $myDatabase.Tables)
 Exposed methods
 
 on smo.Table
+
 ScriptProcedureList(string header)
+
 ScriptProcedureSelect(string header)
+
 ScriptProcedureSelectWithTVP(string header)
+
 ScriptProcedureInsert(string header)
+
 ScriptProcedureUpdate(string header)
+
 ScriptProcedureDelete(string header)
 
 on smo.DataType
+
 ScriptToSql() to convert a DataType into TSql
