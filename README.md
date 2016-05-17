@@ -61,7 +61,7 @@ $myDatabase = $myServer.Databases["AdventureWorks2014"]
 foreach($myTable in $myDatabase.Tables)
 
 {
- 
+
     [KMO.KTable]::ScriptProcedureSelect($myTable, $header)
 
 }
