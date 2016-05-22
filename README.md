@@ -1,75 +1,73 @@
-# KMO
-Kankuru Management Object
+# KMO - Kankuru Management Object
 Kmo is a .net library to extend SMO library. 
 SMO is a powerful library provided by Microsoft but in Kankuru I needed more :)
 In a near future, I'll extend more methods.
 
 You just need to import KMO.dll in your smo project and you'll obtain more methods.
 
-Example :
-You can use KMO with SMO in C# :
+## C# :
 
-using Microsoft.SqlServer.Management.Smo;
+    using Microsoft.SqlServer.Management.Smo;
 
-using KMO;
-
-namespace KMOTest
-
-{
-
-    class Program
+    using KMO;
+    
+    namespace KMOTest
     
     {
     
-        static void Main(string[] args)
+        class Program
         
         {
         
-            string header = "-- Stored Procedure Header";
-            
-            Server myServer = new Server("localhost"); // connection string
-            
-            Database myDatabase = myServer.Databases["AdventureWorks2014"]; // your database
-            
-            foreach (Table myTable in myDatabase.Tables)
+            static void Main(string[] args)
             
             {
             
-                Console.WriteLine(myTable.ScriptProcedureSelect(header)); // here is one KMO method
+                string header = "-- Stored Procedure Header";
+                
+                Server myServer = new Server("localhost"); // connection string
+                
+                Database myDatabase = myServer.Databases["AdventureWorks2014"]; // your database
+                
+                foreach (Table myTable in myDatabase.Tables)
+                
+                {
+                
+                    Console.WriteLine(myTable.ScriptProcedureSelect(header)); // here is one KMO method
+                    
+                }
                 
             }
             
         }
         
     }
+
+
+## Powershell :
+
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO')
     
-}
+    Import-Module "C:\Sources\KMO\bin\Debug\KMO.dll"
+    
+    $header = "-- Stored Procedure Header"
+    
+    $myServer = New-Object ('Microsoft.SqlServer.Management.Smo.Server') "localhost"
+    
+    $myDatabase = $myServer.Databases["AdventureWorks2014"]
+    
+    foreach($myTable in $myDatabase.Tables)
+    
+    {
+    
+        [KMO.KTable]::ScriptProcedureSelect($myTable, $header)
+    
+    }
 
 
-Or in powershell :
+## Exposed methods
 
-[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO')
-
-Import-Module "C:\Sources\KMO\bin\Debug\KMO.dll"
-
-$header = "-- Stored Procedure Header"
-
-$myServer = New-Object ('Microsoft.SqlServer.Management.Smo.Server') "localhost"
-
-$myDatabase = $myServer.Databases["AdventureWorks2014"]
-
-foreach($myTable in $myDatabase.Tables)
-
-{
-
-    [KMO.KTable]::ScriptProcedureSelect($myTable, $header)
-
-}
-
-
-Exposed methods
-
-on smo.Table
+### smo.Table
 
 ScriptProcedureList(string header)
 
@@ -83,6 +81,6 @@ ScriptProcedureUpdate(string header)
 
 ScriptProcedureDelete(string header)
 
-on smo.DataType
+### smo.DataType
 
 ScriptToSql() to convert a DataType into TSql
