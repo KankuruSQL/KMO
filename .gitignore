@@ -1,4 +1,6 @@
 *.suo
 *.pdb
+*/bin/*
+*/obj/*
 */*/bin/*
 */*/obj/*
