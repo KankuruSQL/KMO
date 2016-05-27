@@ -3,6 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScriptProcedures", "ScriptProcedures\ScriptProcedures.csproj", "{88C0EE37-FD9A-40C9-A923-1AB5321B3E85}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GetDistributionDatabases", "GetDistributionDatabases\GetDistributionDatabases.csproj", "{49760C85-5146-404A-B2D1-3F0625699A8D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -13,6 +15,10 @@ Global
 		{88C0EE37-FD9A-40C9-A923-1AB5321B3E85}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{88C0EE37-FD9A-40C9-A923-1AB5321B3E85}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{88C0EE37-FD9A-40C9-A923-1AB5321B3E85}.Release|Any CPU.Build.0 = Release|Any CPU
+		{49760C85-5146-404A-B2D1-3F0625699A8D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49760C85-5146-404A-B2D1-3F0625699A8D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49760C85-5146-404A-B2D1-3F0625699A8D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49760C85-5146-404A-B2D1-3F0625699A8D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

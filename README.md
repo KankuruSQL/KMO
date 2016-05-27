@@ -8,79 +8,50 @@ You just need to import KMO.dll in your smo project and you'll obtain more metho
 ## C# :
 
     using Microsoft.SqlServer.Management.Smo;
-
-    using KMO;
-    
+    using KMO;    
     namespace KMOTest
-    
-    {
-    
-        class Program
-        
-        {
-        
-            static void Main(string[] args)
-            
-            {
-            
-                string header = "-- Stored Procedure Header";
-                
-                Server myServer = new Server("localhost"); // connection string
-                
-                Database myDatabase = myServer.Databases["AdventureWorks2014"]; // your database
-                
-                foreach (Table myTable in myDatabase.Tables)
-                
-                {
-                
-                    Console.WriteLine(myTable.ScriptProcedureSelect(header)); // here is one KMO method
-                    
-                }
-                
-            }
-            
-        }
-        
+    {    
+        class Program        
+        {        
+            static void Main(string[] args)            
+            {            
+                string header = "-- Stored Procedure Header";                
+                Server myServer = new Server("localhost"); // connection string                
+                Database myDatabase = myServer.Databases["AdventureWorks2014"]; // your database                
+                foreach (Table myTable in myDatabase.Tables)                
+                {                
+                    Console.WriteLine(myTable.ScriptProcedureSelect(header)); // here is one KMO method                    
+                }                
+            }            
+        }        
     }
-
 
 ## Powershell :
 
-    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO')
-    
-    Import-Module "C:\Sources\KMO\bin\Debug\KMO.dll"
-    
-    $header = "-- Stored Procedure Header"
-    
-    $myServer = New-Object ('Microsoft.SqlServer.Management.Smo.Server') "localhost"
-    
-    $myDatabase = $myServer.Databases["AdventureWorks2014"]
-    
-    foreach($myTable in $myDatabase.Tables)
-    
-    {
-    
-        [KMO.KTable]::ScriptProcedureSelect($myTable, $header)
-    
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO')    
+    Import-Module "C:\Sources\KMO\bin\Debug\KMO.dll"    
+    $header = "-- Stored Procedure Header"    
+    $myServer = New-Object ('Microsoft.SqlServer.Management.Smo.Server') "localhost"    
+    $myDatabase = $myServer.Databases["AdventureWorks2014"]    
+    foreach($myTable in $myDatabase.Tables)    
+    {    
+        [KMO.KTable]::ScriptProcedureSelect($myTable, $header)    
     }
-
 
 ## Exposed methods
 
+### smo.Database
+    IsDistributor()
+    
 ### smo.Table
 
-ScriptProcedureList(string header)
-
-ScriptProcedureSelect(string header)
-
-ScriptProcedureSelectWithTVP(string header)
-
-ScriptProcedureInsert(string header)
-
-ScriptProcedureUpdate(string header)
-
-ScriptProcedureDelete(string header)
+    ScriptProcedureList(string header)
+    ScriptProcedureSelect(string header)
+    ScriptProcedureSelectWithTVP(string header)
+    ScriptProcedureInsert(string header)
+    ScriptProcedureUpdate(string header)
+    ScriptProcedureDelete(string header)
 
 ### smo.DataType
 
-ScriptToSql() to convert a DataType into TSql
+    ScriptToSql() to convert a DataType into TSql
