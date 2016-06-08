@@ -53,7 +53,7 @@ You just need to import KMO.dll in your smo project and you'll obtain more metho
     ScriptProcedureDelete(string header)
     CompareDataLight(smo.Table secondTable)
     CompareData(smo.Table secondTable, out DataTable RowsAdded, out DataTable RowsDeleted, out DataTable RowsUpdated, [bool details = false])
-    
+    DataChecksum()  
 
 ### smo.DataType
 
