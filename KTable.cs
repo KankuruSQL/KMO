@@ -12,6 +12,7 @@ namespace KMO
     /// </summary>
     public static class KTable
     {
+        #region Procedure scripting
         /// <summary>
         /// Generates the CREATE PROCEDURE statement to List the whole table
         /// </summary>
@@ -349,7 +350,9 @@ GO
             }
             return sb.ToString();
         }
+        #endregion
 
+        #region Compare Data
         /// <summary>
         /// Compare 2 tables data.
         /// Checksum doesn't manage these types : Xml, Image, Geography, ntext, text
@@ -446,14 +449,41 @@ GO
         /// <returns>column list</returns>
         private static string GetJoinedColumnsWithoutPK(smo.Table t)
         {
+            StringBuilder sb = new StringBuilder();
             IEnumerable<smo.Column> columns = t.Columns.Cast<smo.Column>()
                 .Where(c => !c.InPrimaryKey)
                 .Where(c => c.DataType.SqlDataType.ToString() != "Xml"
+                        && c.DataType.SqlDataType.ToString() != "VarChar"
+                        && c.DataType.SqlDataType.ToString() != "NVarChar"
+                        && c.DataType.SqlDataType.ToString() != "SysName"
+                        && c.DataType.SqlDataType.ToString() != "Char"
+                        && c.DataType.SqlDataType.ToString() != "NChar"
                         && c.DataType.SqlDataType.ToString() != "Image"
                         && c.DataType.SqlDataType.ToString() != "Geography"
                         && c.DataType.SqlDataType.ToString() != "ntext"
                         && c.DataType.SqlDataType.ToString() != "text");
-            return string.Join(", ", columns);
+            string s1 = string.Join(", ", columns);
+            if (!string.IsNullOrEmpty(s1))
+            {
+                sb.Append(s1);
+            }
+            IEnumerable<smo.Column> columnsString = t.Columns.Cast<smo.Column>()
+                .Where(c => !c.InPrimaryKey)
+                .Where(c => c.DataType.SqlDataType.ToString() == "VarChar"
+                        || c.DataType.SqlDataType.ToString() == "NVarChar"
+                        || c.DataType.SqlDataType.ToString() == "SysName"
+                        || c.DataType.SqlDataType.ToString() == "Char"
+                        || c.DataType.SqlDataType.ToString() == "NChar");
+            string s2 = "HASHBYTES('MD5', " + string.Join(") , HASHBYTES('MD5', ", columnsString) + ")";
+            if (!string.IsNullOrEmpty(s2))
+            {
+                if (sb.Length > 0)
+                {
+                    sb.Append(", ");
+                }
+                sb.Append(s2);
+            }
+            return sb.ToString();
         }
 
 
@@ -464,13 +494,39 @@ GO
         /// <returns>column list</returns>
         private static string GetJoinedColumns(smo.Table t)
         {
+            StringBuilder sb = new StringBuilder();
             IEnumerable<smo.Column> columns = t.Columns.Cast<smo.Column>()
                 .Where(c => c.DataType.SqlDataType.ToString() != "Xml"
+                        && c.DataType.SqlDataType.ToString() != "VarChar"
+                        && c.DataType.SqlDataType.ToString() != "NVarChar"
+                        && c.DataType.SqlDataType.ToString() != "SysName"
+                        && c.DataType.SqlDataType.ToString() != "Char"
+                        && c.DataType.SqlDataType.ToString() != "NChar"
                         && c.DataType.SqlDataType.ToString() != "Image"
                         && c.DataType.SqlDataType.ToString() != "Geography"
                         && c.DataType.SqlDataType.ToString() != "ntext"
                         && c.DataType.SqlDataType.ToString() != "text");
-            return string.Join(", ", columns);
+            string s1 = string.Join(", ", columns);
+            if (!string.IsNullOrEmpty(s1))
+            {
+                sb.Append(s1);
+            }
+            IEnumerable<smo.Column> columnsString = t.Columns.Cast<smo.Column>()
+                .Where(c => c.DataType.SqlDataType.ToString() == "VarChar"
+                        || c.DataType.SqlDataType.ToString() == "NVarChar"
+                        || c.DataType.SqlDataType.ToString() == "SysName"
+                        || c.DataType.SqlDataType.ToString() == "Char"
+                        || c.DataType.SqlDataType.ToString() == "NChar");
+            string s2 = "HASHBYTES('MD5', " + string.Join(") , HASHBYTES('MD5', ", columnsString) + ")";
+            if (!string.IsNullOrEmpty(s2))
+            {
+                if (sb.Length > 0)
+                {
+                    sb.Append(", ");
+                }
+                sb.Append(s2);
+            }
+            return sb.ToString();
         }
 
         /// <summary>
@@ -529,6 +585,8 @@ GO
             }
             return hasRowsUpdated;
         }
+
+        #endregion
 
     }
 }
