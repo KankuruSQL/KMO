@@ -460,8 +460,8 @@ GO
                         && c.DataType.SqlDataType.ToString() != "NChar"
                         && c.DataType.SqlDataType.ToString() != "Image"
                         && c.DataType.SqlDataType.ToString() != "Geography"
-                        && c.DataType.SqlDataType.ToString() != "ntext"
-                        && c.DataType.SqlDataType.ToString() != "text");
+                        && c.DataType.SqlDataType.ToString() != "NText"
+                        && c.DataType.SqlDataType.ToString() != "Text");
             string s1 = string.Join(", ", columns);
             if (!string.IsNullOrEmpty(s1))
             {
@@ -474,7 +474,12 @@ GO
                         || c.DataType.SqlDataType.ToString() == "SysName"
                         || c.DataType.SqlDataType.ToString() == "Char"
                         || c.DataType.SqlDataType.ToString() == "NChar");
-            string s2 = "HASHBYTES('MD5', " + string.Join(") , HASHBYTES('MD5', ", columnsString) + ")";
+            //string s2 = "HASHBYTES('MD5', " + string.Join(") , HASHBYTES('MD5', ", columnsString) + ")";
+            string s2 = string.Join(") , HASHBYTES('MD5', ", columnsString);
+            if (!string.IsNullOrEmpty(s2))
+            {
+                s2 = "HASHBYTES('MD5', " + s2 + ")";
+            }
             if (!string.IsNullOrEmpty(s2))
             {
                 if (sb.Length > 0)
@@ -504,8 +509,8 @@ GO
                         && c.DataType.SqlDataType.ToString() != "NChar"
                         && c.DataType.SqlDataType.ToString() != "Image"
                         && c.DataType.SqlDataType.ToString() != "Geography"
-                        && c.DataType.SqlDataType.ToString() != "ntext"
-                        && c.DataType.SqlDataType.ToString() != "text");
+                        && c.DataType.SqlDataType.ToString() != "NText"
+                        && c.DataType.SqlDataType.ToString() != "Text");
             string s1 = string.Join(", ", columns);
             if (!string.IsNullOrEmpty(s1))
             {
@@ -517,7 +522,13 @@ GO
                         || c.DataType.SqlDataType.ToString() == "SysName"
                         || c.DataType.SqlDataType.ToString() == "Char"
                         || c.DataType.SqlDataType.ToString() == "NChar");
-            string s2 = "HASHBYTES('MD5', " + string.Join(") , HASHBYTES('MD5', ", columnsString) + ")";
+            //string s2 = "HASHBYTES('MD5', " + string.Join(") , HASHBYTES('MD5', ", columnsString) + ")";
+            string s2 = string.Join(") , HASHBYTES('MD5', ", columnsString);
+            if (!string.IsNullOrEmpty(s2))
+            {
+                s2 = "HASHBYTES('MD5', " + s2 + ")";
+            }
+
             if (!string.IsNullOrEmpty(s2))
             {
                 if (sb.Length > 0)
