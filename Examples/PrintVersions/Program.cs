@@ -16,7 +16,7 @@ namespace PrintVersions
             // In this example, you can get your instance version
             ServerConnection myCnx = new ServerConnection("localhost");
             Server myServer = new Server(myCnx);
-            Console.WriteLine("Version : " + myServer.VersionString());
+            Console.WriteLine("Version : " + myServer.VersionName());
             Console.WriteLine("Full Version : " + myServer.VersionFull());
             myCnx.Disconnect();
             Console.Read();

@@ -41,7 +41,7 @@ You just need to import KMO.dll in your smo project and you'll obtain more metho
 ## Exposed methods
 
 ### smo.Server
-    VersionString()
+    VersionName()
     VersionFull()
 
 ### smo.Database

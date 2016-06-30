@@ -13,7 +13,7 @@ namespace KMO
         /// </summary>
         /// <param name="s">your smo server object</param>
         /// <returns>a string</returns>
-        public static string VersionString(this smo.Server s)
+        public static string VersionName(this smo.Server s)
         {
             string version;
             switch (s.VersionMajor.ToString() + "." + s.VersionMinor.ToString())
@@ -56,7 +56,7 @@ namespace KMO
         /// <returns>a string</returns>
         public static string VersionFull(this smo.Server s)
         {
-            return string.Format("{0} {1} {2} ({3})", s.VersionString(), s.ProductLevel, s.Edition, s.Version);
+            return string.Format("{0} {1} {2} ({3})", s.VersionName(), s.ProductLevel, s.Edition, s.Version);
         }
 
     }
