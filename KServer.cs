@@ -9,10 +9,10 @@ namespace KMO
     public static class KServer
     {
         /// <summary>
-        /// 
+        /// Get Sql server version name from major and minor version
         /// </summary>
-        /// <param name="s"></param>
-        /// <returns></returns>
+        /// <param name="s">your smo server object</param>
+        /// <returns>a string</returns>
         public static string VersionString(this smo.Server s)
         {
             string version;
@@ -50,10 +50,10 @@ namespace KMO
         }
 
         /// <summary>
-        /// 
+        /// Get Sql server full version name from major and minor version, productLevel, Edition and version
         /// </summary>
-        /// <param name="s"></param>
-        /// <returns></returns>
+        /// <param name="s">your smo server object</param>
+        /// <returns>a string</returns>
         public static string VersionFull(this smo.Server s)
         {
             return string.Format("{0} {1} {2} ({3})", s.VersionString(), s.ProductLevel, s.Edition, s.Version);
