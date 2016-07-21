@@ -107,5 +107,101 @@ WHERE rol.name = 'sysadmin'
 ORDER BY mem.name");
         }
         #endregion
+
+        #region Disk Space
+        public static DataSet GetFileTreeMaps(this smo.Server s, int minSize = 0, int maxSize = 2147483647, bool withData = true, bool withLog = true)
+        {
+            smo.Database d = s.Databases["master"];
+            string fileTypeFilter = string.Empty;
+
+            if (!withData)
+            {
+                fileTypeFilter += " AND b.TYPE != 0 ";
+            }
+            if (!withLog)
+            {
+                fileTypeFilter += " AND b.TYPE = 0 ";
+            }
+
+            string sql = string.Format(@"CREATE TABLE #TMPLASTFILECHANGE 
+(
+	databasename nvarchar(128)
+	, filename nvarchar(128)
+	, endtime datetime
+)
+
+DECLARE @path NVARCHAR(1000)
+SELECT @path = SUBSTRING(PATH, 1, LEN(PATH) - CHARINDEX('\', REVERSE(PATH))) + '\log.trc'
+FROM sys.traces
+WHERE id = 1;
+
+WITH CTE (databaseid, filename, EndTime)
+AS
+(
+	SELECT databaseid
+		, filename
+		, MAX(t.EndTime) AS EndTime
+	FROM ::fn_trace_gettable(@path, default ) t
+	WHERE EventClass IN (92, 93)
+		AND DATEDIFF(hh,StartTime,GETDATE()) < 24
+	GROUP BY databaseid
+		, filename
+)
+INSERT INTO #TMPLASTFILECHANGE
+(
+	databasename
+	, filename
+	, endtime
+)
+SELECT DB_NAME(database_id) AS DatabaseName
+	, mf.name AS LogicalName
+	, cte.EndTime
+FROM sys.master_files mf
+	LEFT JOIN CTE cte on mf.database_id=cte.databaseid 
+		AND mf.name=cte.filename
+WHERE cte.EndTime IS NOT NULL
+
+CREATE TABLE #TMPSPACEUSED 
+(
+	DBNAME    NVARCHAR(128),
+	FILENAME   NVARCHAR(128),
+	SPACEUSED FLOAT
+)
+
+INSERT INTO #TMPSPACEUSED
+(
+	DBNAME
+	, FILENAME
+	, SPACEUSED
+)
+EXEC('sp_MSforeachdb''use [?]; Select ''''?'''' AS DBName
+			, Name AS FileNme
+			, fileproperty(Name,''''SpaceUsed'''') AS SpaceUsed 
+		FROM sys.sysfiles''')
+
+SELECT a.name AS DatabaseName
+	, b.name AS FileName
+	, CASE b.TYPE WHEN 0 THEN 'DATA' ELSE b.type_desc END AS FileType
+	, CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) AS FileSize
+	, CAST((b.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) / CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) * 100 AS FreeSpace
+	, b.physical_name
+	, datediff(DAY, c.endtime, GETDATE()) AS LastGrowth
+FROM sys.databases a
+	INNER JOIN sys.master_files b ON a.database_id = b.database_id
+	INNER JOIN #TMPSPACEUSED d  ON a.NAME = d.DBNAME 
+		AND b.name = d.FILENAME
+	LEFT JOIN #TMPLASTFILECHANGE c on a.name = c.databasename 
+		AND b.name = c.filename
+WHERE b.size >= ({0} / 8.0 * 1024.0)
+	AND b.size <= ({1} / 8.0 * 1024.0)
+    {2}
+ORDER BY FILESIZE DESC
+
+DROP TABLE #TMPSPACEUSED
+DROP TABLE #TMPLASTFILECHANGE
+", minSize, maxSize, fileTypeFilter);
+            return d.ExecuteWithResults(sql);
+        }
+        #endregion
     }
 }
