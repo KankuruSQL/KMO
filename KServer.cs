@@ -109,6 +109,15 @@ ORDER BY mem.name");
         #endregion
 
         #region Disk Space
+        /// <summary>
+        /// Get information (size, freespace, name, last autogrowth) for each databases files.
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <param name="minSize">Use this param to hide files smaller than this size in Mb(0 by default)</param>
+        /// <param name="maxSize">Use this param to hide files greater than this size in Mb(2147483647 by default)</param>
+        /// <param name="withData">To get data files (true by default)</param>
+        /// <param name="withLog">To get log files (true by default)</param>
+        /// <returns>a dataset</returns>
         public static DataSet GetFileTreeMaps(this smo.Server s, int minSize = 0, int maxSize = 2147483647, bool withData = true, bool withLog = true)
         {
             smo.Database d = s.Databases["master"];
