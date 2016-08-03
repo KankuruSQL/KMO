@@ -94,5 +94,39 @@ ORDER BY backup_start_date DESC
             return d.ExecuteWithResults(sql);
         }
         #endregion
+
+        #region Audits
+        /// <summary>
+        /// Get the list of Foreign Keys not indexed. It's often a good idea to index them (not always!)
+        /// </summary>
+        /// <param name="d">your smo database</param>
+        /// <returns>a dataset with the result of the query. You can easily customize this query since Kankuru Datagrid autogenerate columns</returns>
+        public static DataSet GetFKWithoutIndex(this smo.Database d)
+        {
+            string sql = @"SELECT s.name AS [Schema Name]
+	, OBJECT_NAME(fk.parent_object_id) AS [Table Name]
+	, c.name AS [Column Name]
+	, fk.name AS [Constraint Name]
+	, fk.is_disabled AS [Is Disabled]
+FROM sys.foreign_keys fk (NOLOCK)
+	INNER JOIN sys.foreign_key_columns fc (NOLOCK) ON fk.OBJECT_ID = fc.constraint_object_id
+	INNER JOIN sys.columns c (NOLOCK) ON fc.parent_column_id = c.column_id 
+		AND fc.parent_object_id = c.object_id
+	INNER JOIN sys.tables t (NOLOCK) ON fk.parent_object_id = t.object_id
+	INNER JOIN sys.schemas s (NOLOCK) ON t.schema_id = s.schema_id
+WHERE NOT EXISTS (
+	SELECT * FROM sys.tables t  (NOLOCK)
+		INNER JOIN sys.indexes i (NOLOCK) ON i.object_id = t.object_id  
+		INNER JOIN sys.columns c2 (NOLOCK) ON t.object_id = c2.object_id  
+		INNER JOIN sys.index_columns ic (NOLOCK) ON ic.object_id = t.object_id 
+			AND i.index_id = ic.index_id 
+			AND ic.column_id = c2.column_id  
+	WHERE t.type = 'U' 
+		AND t.name = OBJECT_NAME(fk.parent_object_id)
+		AND c2.name = c.name)";
+            return d.ExecuteWithResults(sql);
+        }
+
+        #endregion
     }
 }
