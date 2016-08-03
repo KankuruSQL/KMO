@@ -212,5 +212,77 @@ DROP TABLE #TMPLASTFILECHANGE
             return d.ExecuteWithResults(sql);
         }
         #endregion
+
+        #region CPU
+        /// <summary>
+        /// Get the CPU usage by database from query execution statistics
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>return the result of the query in a dataset</returns>
+        public static DataSet GetCPUbyDatabase(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"WITH DB_CPU_Stats AS
+(
+	SELECT DatabaseID
+		, DB_Name(DatabaseID) AS DatabaseName
+		, SUM(total_worker_time) / 1000 AS CPU_Time_Ms
+    FROM sys.dm_exec_query_stats AS qs (NOLOCK)
+    CROSS APPLY (SELECT CONVERT(int, value) AS DatabaseID
+                FROM sys.dm_exec_plan_attributes(qs.plan_handle)
+                WHERE attribute = N'dbid') AS F_DB
+    GROUP BY DatabaseID
+)
+SELECT DatabaseName
+	, CPU_Time_Ms
+	, CAST(CPU_Time_Ms * 1.0 / SUM(CPU_Time_Ms) OVER() * 100.0 AS DECIMAL(5, 2)) AS CPUPercent
+	
+FROM DB_CPU_Stats 
+WHERE DatabaseID != 32767 
+ORDER BY ROW_NUMBER() OVER(ORDER BY CPU_Time_Ms DESC) OPTION (RECOMPILE)";
+            return d.ExecuteWithResults(sql);
+        }
+        
+        /// <summary>
+        /// Get the CPU usage history (256 last ticks) from dm_os_ring_buffers
+        /// This dmv is not supported by Microsoft...
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
+        public static DataSet GetCPUFromRing(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"DECLARE @ts_now bigint
+SELECT @ts_now = cpu_ticks / (cpu_ticks / ms_ticks)
+FROM sys.dm_os_sys_info
+;WITH ring AS
+(
+    SELECT
+       record.value('(Record/@id)[1]', 'int') AS record_id,
+       DATEADD (ms, -1 * (@ts_now - [timestamp]), GETDATE()) AS EventTime,
+       100-record.value('(Record/SchedulerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS system_cpu_utilization_post_sp2,
+       record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS sql_cpu_utilization_post_sp2 ,
+       100-record.value('(Record/SchedluerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS system_cpu_utilization_pre_sp2,
+       record.value('(Record/SchedluerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS sql_cpu_utilization_pre_sp2
+     FROM (
+       SELECT timestamp, CONVERT (xml, record) AS record
+       FROM sys.dm_os_ring_buffers
+       WHERE ring_buffer_type = 'RING_BUFFER_SCHEDULER_MONITOR'
+         AND record LIKE '%<SystemHealth>%') AS t
+), cte AS
+(
+    SELECT EventTime
+        , CASE WHEN system_cpu_utilization_post_sp2 IS NOT NULL THEN system_cpu_utilization_post_sp2 ELSE system_cpu_utilization_pre_sp2 END AS system_cpu
+        , CASE WHEN sql_cpu_utilization_post_sp2 IS NOT NULL THEN sql_cpu_utilization_post_sp2 ELSE sql_cpu_utilization_pre_sp2 END AS sql_cpu
+    FROM ring
+)
+SELECT EventTime
+    , system_cpu
+    , CASE WHEN sql_cpu > system_cpu THEN sql_cpu / 2 ELSE sql_cpu END AS sql_cpu
+FROM cte
+ORDER BY EventTime DESC";
+            return d.ExecuteWithResults(sql);
+        }
+        #endregion
     }
 }
