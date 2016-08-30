@@ -63,6 +63,67 @@ namespace KMO
 
         #endregion
 
+        #region Monitoring
+        /// <summary>
+        /// Get informations about actives session. Locks, performances issues, percent complete, execution plans, etc...
+        /// </summary>
+        /// <param name="s">Your smo Server</param>
+        /// <param name="WithSystemSession">True if you want to select system session. False if you only need user sessions</param>
+        /// <param name="WithQueryPlan">True if you want to fill the last column with query plan (xml format). False without execution plan and better performances</param>
+        /// <returns>The result of the query in a dataset</returns>
+        public static DataSet GetLiveSession(this smo.Server s, bool WithSystemSession = false, bool WithQueryPlan = false)
+        {
+            smo.Database d = s.Databases["master"];
+            string _sql = @"SELECT CAST(qe.session_id AS VARCHAR) AS [Kill]
+    , CASE WHEN CAST(blocking_session_id AS VARCHAR) = '0' THEN '' ELSE CAST(blocking_session_id AS VARCHAR) END AS [Blocking_Session_Info]
+	, s.login_name AS [Login]
+	, s.host_name AS [Host_Name]
+	, s.program_name AS [Program_Name]
+	, s.client_interface_name AS [Client_Interface_Name]
+	, db_name(qe.Database_id) AS [Database]
+	, qe.logical_reads AS [Logical_Read]
+	, qe.cpu_time AS [CPU_Time]
+	, DATEDIFF(MINUTE, start_time, getdate()) AS [Duration]
+	, command AS [Command]
+	, qe.status AS [Status]
+	, percent_complete AS [Percent_Complete]
+	, start_time AS [Start_Time]
+    , qe.open_transaction_count AS [Open_Transaction_Count]
+    , a.text AS [Query]
+    , {0} AS [Execution_Plan]
+FROM sys.dm_exec_requests qe (NOLOCK)
+	INNER JOIN sys.dm_exec_sessions s (NOLOCK) on qe.session_id = s.session_id 
+	LEFT JOIN (select sqe.session_id
+					, st.text
+				FROM sys.dm_exec_requests sqe (NOLOCK)
+					CROSS APPLY sys.dm_exec_sql_text(sqe.sql_handle) st) a ON qe.session_id = a.session_id
+{1}
+WHERE qe.session_id != @@SPID
+	{2}
+ORDER BY blocking_session_id DESC
+	, Duration DESC
+	, [CPU_Time] DESC";
+            string _sql0 = "''";
+            string _sql1 = string.Empty;
+            string _sql2 = string.Empty;
+            if (WithQueryPlan)
+            {
+                _sql0 = "b.query_plan";
+                _sql1 = @"	LEFT JOIN (select sqe.session_id
+					, ph.query_plan
+				FROM sys.dm_exec_requests sqe (NOLOCK)
+					CROSS APPLY sys.dm_exec_query_plan(sqe.plan_handle) ph) b ON qe.session_id = b.session_id";
+            }
+            if (!WithSystemSession)
+            {
+                _sql2 = "AND s.is_user_process = 1";
+            }
+            _sql = string.Format(_sql, _sql0, _sql1, _sql2);
+            return d.ExecuteWithResults(_sql);
+        }
+
+        #endregion
+
         #region Backups
         /// <summary>
         /// For each DB, get the recovery model, the last backup full and the last restore
