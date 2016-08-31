@@ -122,6 +122,46 @@ ORDER BY blocking_session_id DESC
             return d.ExecuteWithResults(_sql);
         }
 
+        /// <summary>
+        /// Get informations about all sessions on a server
+        /// </summary>
+        /// <param name="s">Your smo Server</param>
+        /// <returns>The result of the query in a dataset</returns>
+        public static DataSet GetWho(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(@"SELECT sp.spid
+	, sp.blocked AS Blocked
+	, d.name as [Database]
+	, RTRIM(sp.hostname) AS [Hostname]
+	, RTRIM(sp.program_name) AS [Program Name]
+	, RTRIM(sp.loginame) AS [Login Name]
+	, RTRIM(sp.nt_domain) AS [NT Domain]
+	, RTRIM(sp.nt_username) AS [NT Username]
+	, sp.waittime AS [Wait Time]
+	, RTRIM(sp.lastwaittype) AS [Last Wait Type]
+	, sp.cpu as [CPU]
+	, sp.physical_io AS [Physical IO]
+	, sp.memusage AS [Memory]
+	, sp.login_time AS [Login Time]
+	, sp.last_batch AS [Last Batch]
+	, sp.ecid AS [Execution Context ID]
+	, sp.open_tran AS [Open Tran]
+	, RTRIM(sp.status) AS [Status]
+	, sp.hostprocess AS [Host Process]
+	, RTRIM(sp.cmd) AS [Command Type]
+	, sp.net_address AS [NET Adress]
+	, RTRIM(sp.net_library) AS [NET Library]
+	, sp2.spid AS [Blocking]
+FROM master.dbo.sysprocesses sp
+	LEFT JOIN master.dbo.sysdatabases d ON sp.dbid = d.dbid
+	LEFT JOIN master.dbo.sysusers u ON sp.uid = u.uid
+	LEFT JOIN master.dbo.sysprocesses sp2 ON sp.spid = sp2.blocked
+ORDER BY sp.blocked
+    , d.name
+    , sp.cpu DESC");
+        }
+
         #endregion
 
         #region Backups
