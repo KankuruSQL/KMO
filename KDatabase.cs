@@ -211,6 +211,23 @@ ORDER by [Table]
             return d.ExecuteWithResults(sql);
         }
 
+        /// <summary>
+        /// Get list of Heap Indexes for the specified database
+        /// </summary>
+        /// <param name="d">your smo database</param>
+        /// <returns>a dataset with the result of the query.</returns>
+        public static DataSet GetHeapIndex(this smo.Database d)
+        {
+            return d.ExecuteWithResults(@"SELECT s.name + '.' + t.name AS [Table Name]
+	, create_date AS [Create Date]
+	, modify_date AS [Modify Date]
+FROM sys.indexes i (NOLOCK)
+	INNER JOIN sys.tables t (NOLOCK) ON t.object_id = i.object_id
+	INNER JOIN sys.schemas s (NOLOCK) ON t.schema_id = s.schema_id
+WHERE i.[type] = 0 
+ORDER BY [Table Name]");
+        }
+
         #endregion
     }
 }
