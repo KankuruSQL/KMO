@@ -209,7 +209,7 @@ ORDER BY mem.name");
         }
         #endregion
 
-        #region Disk Space
+        #region Disk
         /// <summary>
         /// Get information (size, freespace, name, last autogrowth) for each databases files.
         /// </summary>
@@ -311,6 +311,33 @@ DROP TABLE #TMPSPACEUSED
 DROP TABLE #TMPLASTFILECHANGE
 ", minSize, maxSize, fileTypeFilter);
             return d.ExecuteWithResults(sql);
+        }
+
+        /// <summary>
+        /// Get IO statistics by database files.
+        /// Useful to detect disk performance issue or high database IO
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>return the result of the query in a dataset</returns>
+        public static DataSet GetIOStatistics(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(@"SELECT DB_NAME(fs.database_id) AS [Database Name]
+	, mf.physical_name AS [Physical Name]
+	, io_stall_read_ms AS [IO Stall Read ms]
+	, num_of_reads AS [Num of Reads]
+	, CAST(io_stall_read_ms/(1.0 + num_of_reads) AS NUMERIC(10,1)) AS [Avg Read Stall ms]
+	, io_stall_write_ms AS [IO Stall Write ms]
+	, num_of_writes AS [Num of Writes]
+	, CAST(io_stall_write_ms/(1.0+num_of_writes) AS NUMERIC(10,1)) AS [Avg Write Stall ms]
+	, io_stall_read_ms + io_stall_write_ms AS [IO Stalls]
+	, num_of_reads + num_of_writes AS [Total IO]
+	, CAST((io_stall_read_ms + io_stall_write_ms)/(1.0 + num_of_reads + num_of_writes) AS NUMERIC(10,1)) AS [Avg IO Stall ms]
+FROM sys.dm_io_virtual_file_stats(null,null) AS fs 
+	INNER JOIN sys.master_files AS mf (NOLOCK) ON fs.database_id = mf.database_id 
+		AND fs.[file_id] = mf.[file_id]
+ORDER BY [Avg IO Stall ms] DESC 
+OPTION (RECOMPILE)");
         }
         #endregion
 
