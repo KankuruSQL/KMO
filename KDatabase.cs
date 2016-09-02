@@ -228,6 +228,52 @@ WHERE i.[type] = 0
 ORDER BY [Table Name]");
         }
 
+        /// <summary>
+        /// Get list of Tables without Primary Key
+        /// </summary>
+        /// <param name="d">your smo database</param>
+        /// <returns>a dataset with the result of the query.</returns>
+        public static DataSet GetTableWithoutPK(this smo.Database d)
+        {
+            return d.ExecuteWithResults(@"SELECT s.name as [Schema Name]
+	, t.name as [Table Name]
+FROM sys.tables t
+INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+WHERE t.is_ms_shipped = 0
+	AND NOT EXISTS (
+		SELECT *
+		FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS c
+		WHERE c.CONSTRAINT_TYPE = 'PRIMARY KEY'
+			AND s.name = c.TABLE_SCHEMA
+			AND t.name = c.TABLE_NAME
+	)
+ORDER BY s.name
+	, t.name");
+        }
+
+        /// <summary>
+        /// Get list of Tables without Clustered Index
+        /// </summary>
+        /// <param name="d">your smo database</param>
+        /// <returns>a dataset with the result of the query.</returns>
+        public static DataSet GetTableWithoutClusteredIndex(this smo.Database d)
+        {
+            return d.ExecuteWithResults(@"SELECT s.name AS [Schema Name]
+	, t.name AS [Table Name]
+FROM sys.tables t
+    INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+WHERE t.is_ms_shipped = 0
+	AND NOT EXISTS (
+		SELECT *
+		FROM sys.tables st
+			INNER JOIN sys.schemas ss ON st.schema_id = ss.schema_id
+			INNER JOIN sys.indexes i ON i.object_id = st.object_id
+		WHERE i.type = 1
+			AND s.name = ss.name
+			AND t.name = st.name
+	)
+ORDER BY t.name");
+        }
         #endregion
     }
 }
