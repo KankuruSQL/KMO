@@ -274,6 +274,65 @@ WHERE t.is_ms_shipped = 0
 	)
 ORDER BY t.name");
         }
+
+        /// <summary>
+        /// Get list of Tables with access statistics.
+        /// Note : these statistics are deleted when SQL Server restarts
+        /// </summary>
+        /// <param name="d">your smo database</param>
+        /// <returns>a dataset with the result of the query.</returns>
+        public static DataSet GetLastAccessByTable(this smo.Database d)
+        {
+            return d.ExecuteWithResults(@"WITH agg as (
+	SELECT [object_id] 
+		, last_user_seek 
+		, last_user_scan 
+		, last_user_lookup 
+		, last_user_update 
+	FROM sys.dm_db_index_usage_stats (NOLOCK)
+) 
+SELECT MAX(last_read) AS last_read
+	, max (last_write) as last_write
+	, object_id
+INTO #TEMP
+FROM (
+	SELECT [object_id] 
+		, last_user_seek 
+		, null 
+	FROM agg 
+	UNION all 
+	SELECT [object_id] 
+		, last_user_scan 
+		, null 
+	FROM agg 
+	UNION all 
+	SELECT [object_id] 
+		, last_user_lookup 
+		, null 
+	FROM agg 
+	UNION all 
+	SELECT [object_id] 
+		, null 
+		, last_user_update 
+	FROM agg) AS x 
+	(object_id
+	, last_read 
+	, last_write) 
+GROUP BY object_id
+
+SELECT s.name AS [Schema Name]
+	, t.name AS [Table Name]
+	, temp.last_read AS [Last Read]
+	, temp.last_write AS [Last Write]
+	, CASE WHEN COALESCE(temp.last_read, 0) > COALESCE(temp.last_write, 0) THEN temp.last_read ELSE temp.last_write END AS [Last Access]
+FROM sys.tables t (NOLOCK)
+INNER JOIN sys.schemas s (NOLOCK) ON t.schema_id = s.schema_id
+LEFT JOIN #TEMP temp (NOLOCK) ON t.object_id = temp.object_id
+ORDER BY [Last Access] DESC
+
+DROP TABLE #TEMP");
+        }
+
         #endregion
     }
 }
