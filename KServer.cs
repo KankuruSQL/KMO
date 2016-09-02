@@ -334,10 +334,9 @@ DROP TABLE #TMPLASTFILECHANGE
                 WHERE attribute = N'dbid') AS F_DB
     GROUP BY DatabaseID
 )
-SELECT DatabaseName
-	, CPU_Time_Ms
-	, CAST(CPU_Time_Ms * 1.0 / SUM(CPU_Time_Ms) OVER() * 100.0 AS DECIMAL(5, 2)) AS CPUPercent
-	
+SELECT DatabaseName AS [Database Name]
+	, CPU_Time_Ms AS [CPU Time Ms]
+	, CAST(CPU_Time_Ms * 1.0 / SUM(CPU_Time_Ms) OVER() * 100.0 AS DECIMAL(5, 2)) AS [CPU Percent]	
 FROM DB_CPU_Stats 
 WHERE DatabaseID != 32767 
 ORDER BY ROW_NUMBER() OVER(ORDER BY CPU_Time_Ms DESC) OPTION (RECOMPILE)";
