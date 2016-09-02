@@ -196,11 +196,11 @@ ORDER BY sdb.name");
         public static DataSet GetWhoIsSa(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
-            return d.ExecuteWithResults(@"SELECT mem.name
-	, mem.type_desc
-	, mem.create_date
-	, mem.modify_date
-	, mem.is_disabled
+            return d.ExecuteWithResults(@"SELECT mem.name AS [Login Name]
+	, mem.type_desc AS [Login Type]
+	, mem.create_date AS [Create Date]
+	, mem.modify_date AS [Modify Date]
+	, mem.is_disabled AS [Is Disabled]
 FROM sys.server_role_members AS srm (NOLOCK)
 	INNER JOIN sys.server_principals AS mem (NOLOCK) ON mem.principal_id = srm.member_principal_id
 	INNER JOIN sys.server_principals AS rol (NOLOCK) ON rol.principal_id = srm.role_principal_id
