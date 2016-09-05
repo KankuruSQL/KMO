@@ -459,5 +459,65 @@ HAVING SUM ([W2].[Percentage]) - MAX ([W1].[Percentage]) < 99;", sqlIgnore);
         }
         #endregion
 
+        #region ErrorLogs
+        /// <summary>
+        /// Read ErrorLog files with some improvements :
+        /// Doesn't return successful or failed login
+        /// Remove useless message
+        /// Filter by date
+        /// Filter Informationnal messages
+        /// </summary>
+        /// <param name="s">Your smo server</param>
+        /// <param name="startTime">Doesn't return events before this datetime. You could use DateTime.MinValue if you don't want to filter.</param>
+        /// <param name="endTime">Doesn't return events after this datetime. You could use DateTime.MaxValue if you don't want to filter.</param>
+        /// <param name="logNumber">The file you want to parse. File 0 by default</param>
+        /// <param name="withInformationMessage">Include informationnal messages.</param>
+        /// <returns>a DataTable with the result of the query</returns>
+        public static DataTable ReadErrorLog(this smo.Server s, DateTime startTime, DateTime endTime, int logFileNumber = 0, bool withInformationMessage = false)
+        {
+            string sql = string.Format(@"DECLARE @sqlStatement NVARCHAR(1000);
+SET @sqlStatement = 'master.dbo.xp_readerrorlog {0}'
+CREATE TABLE #KMOErrorLog
+(
+    LogDate DATETIME
+    , ProcessInfo NVARCHAR(50)
+    ,vchMessage NVARCHAR(2000)
+)
+
+INSERT INTO #KMOErrorLog(LogDate, ProcessInfo, vchMessage)
+EXEC sp_executesql @sqlStatement
+
+DELETE FROM #KMOErrorLog 
+WHERE LogDate < '{1}'
+    OR LogDate > '{2}'
+    OR ProcessInfo = 'Logon'
+    OR vchMessage LIKE 'Error: %, Severity: %, State: %.'", logFileNumber, startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"));
+
+            if (!withInformationMessage)
+            {
+                sql += @" 
+DELETE FROM #KMOErrorLog
+WHERE vchMessage LIKE '%This is an informational message%'
+    OR vchMessage LIKE '%DBCC CHECKDB%found 0 errors and repaired 0 errors%'
+    OR vchMessage LIKE '%No user action is required%'
+    OR vchMessage LIKE '%No user action required%'
+    OR vchMessage LIKE '%Ce message est fourni à titre d''information. Aucune action n''est requise de la part de l''utilisateur.%' ";
+            }
+
+            sql += @" SELECT LogDate
+    , ProcessInfo
+    , RTRIM(LTRIM(vchMessage)) AS [Message]
+FROM #KMOErrorLog
+ORDER BY LogDate DESC
+
+DROP TABLE #KMOErrorLog
+";
+
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+
+        }
+        #endregion
+
     }
 }
