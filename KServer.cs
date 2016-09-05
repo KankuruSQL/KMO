@@ -70,8 +70,8 @@ namespace KMO
         /// <param name="s">Your smo Server</param>
         /// <param name="WithSystemSession">True if you want to select system session. False if you only need user sessions</param>
         /// <param name="WithQueryPlan">True if you want to fill the last column with query plan (xml format). False without execution plan and better performances</param>
-        /// <returns>The result of the query in a dataset</returns>
-        public static DataSet GetLiveSession(this smo.Server s, bool WithSystemSession = false, bool WithQueryPlan = false)
+        /// <returns>The result of the query in a DataTable</returns>
+        public static DataTable GetLiveSession(this smo.Server s, bool WithSystemSession = false, bool WithQueryPlan = false)
         {
             smo.Database d = s.Databases["master"];
             string _sql = @"SELECT CAST(qe.session_id AS VARCHAR) AS [Kill]
@@ -119,15 +119,15 @@ ORDER BY blocking_session_id DESC
                 _sql2 = "AND s.is_user_process = 1";
             }
             _sql = string.Format(_sql, _sql0, _sql1, _sql2);
-            return d.ExecuteWithResults(_sql);
+            return d.ExecuteWithResults(_sql).Tables[0];
         }
 
         /// <summary>
         /// Get informations about all sessions on a server
         /// </summary>
         /// <param name="s">Your smo Server</param>
-        /// <returns>The result of the query in a dataset</returns>
-        public static DataSet GetWho(this smo.Server s)
+        /// <returns>The result of the query in a DataTable</returns>
+        public static DataTable GetWho(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
             return d.ExecuteWithResults(@"SELECT sp.spid
@@ -159,7 +159,7 @@ FROM master.dbo.sysprocesses sp
 	LEFT JOIN master.dbo.sysprocesses sp2 ON sp.spid = sp2.blocked
 ORDER BY sp.blocked
     , d.name
-    , sp.cpu DESC");
+    , sp.cpu DESC").Tables[0];
         }
 
         #endregion
@@ -169,8 +169,8 @@ ORDER BY sp.blocked
         /// For each DB, get the recovery model, the last backup full and the last restore
         /// </summary>
         /// <param name="s">your smo server</param>
-        /// <returns>a dataset with 1 datatable containing the result of the query</returns>
-        public static DataSet GetBackupHistory(this smo.Server s)
+        /// <returns>a DataTable with 1 datatable containing the result of the query</returns>
+        public static DataTable GetBackupHistory(this smo.Server s)
         {
             smo.Database d = s.Databases["msdb"];
             return d.ExecuteWithResults(@"SELECT sdb.name AS DatabaseName
@@ -183,7 +183,7 @@ FROM sys.databases sdb (NOLOCK)
 		AND COALESCE(bus.type, 'D') = 'D' 
     LEFT join msdb.dbo.restorehistory rh (NOLOCK) on rh.destination_database_name = sdb.Name
 GROUP BY sdb.name
-ORDER BY sdb.name");
+ORDER BY sdb.name").Tables[0];
         }
         #endregion
 
@@ -193,7 +193,7 @@ ORDER BY sdb.name");
         /// </summary>
         /// <param name="s">your smo server</param>
         /// <returns>the result of the query</returns>
-        public static DataSet GetWhoIsSa(this smo.Server s)
+        public static DataTable GetWhoIsSa(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
             return d.ExecuteWithResults(@"SELECT mem.name AS [Login Name]
@@ -205,7 +205,7 @@ FROM sys.server_role_members AS srm (NOLOCK)
 	INNER JOIN sys.server_principals AS mem (NOLOCK) ON mem.principal_id = srm.member_principal_id
 	INNER JOIN sys.server_principals AS rol (NOLOCK) ON rol.principal_id = srm.role_principal_id
 WHERE rol.name = 'sysadmin'
-ORDER BY mem.name");
+ORDER BY mem.name").Tables[0];
         }
         #endregion
 
@@ -218,8 +218,8 @@ ORDER BY mem.name");
         /// <param name="maxSize">Use this param to hide files greater than this size in Mb(2147483647 by default)</param>
         /// <param name="withData">To get data files (true by default)</param>
         /// <param name="withLog">To get log files (true by default)</param>
-        /// <returns>a dataset</returns>
-        public static DataSet GetFileTreeMaps(this smo.Server s, int minSize = 0, int maxSize = 2147483647, bool withData = true, bool withLog = true)
+        /// <returns>a DataTable</returns>
+        public static DataTable GetFileTreeMaps(this smo.Server s, int minSize = 0, int maxSize = 2147483647, bool withData = true, bool withLog = true)
         {
             smo.Database d = s.Databases["master"];
             string fileTypeFilter = string.Empty;
@@ -310,7 +310,7 @@ ORDER BY FILESIZE DESC
 DROP TABLE #TMPSPACEUSED
 DROP TABLE #TMPLASTFILECHANGE
 ", minSize, maxSize, fileTypeFilter);
-            return d.ExecuteWithResults(sql);
+            return d.ExecuteWithResults(sql).Tables[0];
         }
 
         /// <summary>
@@ -318,8 +318,8 @@ DROP TABLE #TMPLASTFILECHANGE
         /// Useful to detect disk performance issue or high database IO
         /// </summary>
         /// <param name="s">your smo server</param>
-        /// <returns>return the result of the query in a dataset</returns>
-        public static DataSet GetIOStatistics(this smo.Server s)
+        /// <returns>return the result of the query in a DataTable</returns>
+        public static DataTable GetIOStatistics(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
             return d.ExecuteWithResults(@"SELECT DB_NAME(fs.database_id) AS [Database Name]
@@ -337,7 +337,7 @@ FROM sys.dm_io_virtual_file_stats(null,null) AS fs
 	INNER JOIN sys.master_files AS mf (NOLOCK) ON fs.database_id = mf.database_id 
 		AND fs.[file_id] = mf.[file_id]
 ORDER BY [Avg IO Stall ms] DESC 
-OPTION (RECOMPILE)");
+OPTION (RECOMPILE)").Tables[0];
         }
         #endregion
 
@@ -346,8 +346,8 @@ OPTION (RECOMPILE)");
         /// Get the CPU usage by database from query execution statistics
         /// </summary>
         /// <param name="s">your smo server</param>
-        /// <returns>return the result of the query in a dataset</returns>
-        public static DataSet GetCPUbyDatabase(this smo.Server s)
+        /// <returns>return the result of the query in a DataTable</returns>
+        public static DataTable GetCPUbyDatabase(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
             string sql = @"WITH DB_CPU_Stats AS
@@ -367,7 +367,7 @@ SELECT DatabaseName AS [Database Name]
 FROM DB_CPU_Stats 
 WHERE DatabaseID != 32767 
 ORDER BY ROW_NUMBER() OVER(ORDER BY CPU_Time_Ms DESC) OPTION (RECOMPILE)";
-            return d.ExecuteWithResults(sql);
+            return d.ExecuteWithResults(sql).Tables[0];
         }
         
         /// <summary>
@@ -376,7 +376,7 @@ ORDER BY ROW_NUMBER() OVER(ORDER BY CPU_Time_Ms DESC) OPTION (RECOMPILE)";
         /// </summary>
         /// <param name="s"></param>
         /// <returns></returns>
-        public static DataSet GetCPUFromRing(this smo.Server s)
+        public static DataTable GetCPUFromRing(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
             string sql = @"DECLARE @ts_now bigint
@@ -408,8 +408,9 @@ SELECT EventTime
     , CASE WHEN sql_cpu > system_cpu THEN sql_cpu / 2 ELSE sql_cpu END AS sql_cpu
 FROM cte
 ORDER BY EventTime DESC";
-            return d.ExecuteWithResults(sql);
+            return d.ExecuteWithResults(sql).Tables[0];
         }
         #endregion
+
     }
 }

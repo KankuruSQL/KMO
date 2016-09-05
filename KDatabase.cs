@@ -29,8 +29,8 @@ namespace KMO
         /// </summary>
         /// <param name="d">your smo database</param>
         /// <param name="limit">This param will be used in the SELECT TOP XXX</param>
-        /// <returns>a dataset with the result of the query</returns>
-        public static DataSet GetBackupHistory(this smo.Database d, int limit = 1000)
+        /// <returns>a DataTable with the result of the query</returns>
+        public static DataTable GetBackupHistory(this smo.Database d, int limit = 1000)
         {
             string sql = string.Format(@"SELECT TOP {0} 
     CASE s.[type]
@@ -91,7 +91,7 @@ WHERE s.database_name = {1}
 ORDER BY backup_start_date DESC
 	, backup_finish_date", limit, d.Name);
             }
-            return d.ExecuteWithResults(sql);
+            return d.ExecuteWithResults(sql).Tables[0];
         }
         #endregion
 
@@ -101,8 +101,8 @@ ORDER BY backup_start_date DESC
         /// You can easily customize this query and add/remove columns since Kankuru Datagrid autogenerate columns
         /// </summary>
         /// <param name="d">your smo database</param>
-        /// <returns>a dataset with the result of the query.</returns>
-        public static DataSet GetFKWithoutIndex(this smo.Database d)
+        /// <returns>a DataTable with the result of the query.</returns>
+        public static DataTable GetFKWithoutIndex(this smo.Database d)
         {
             string sql = @"SELECT s.name AS [Schema Name]
 	, OBJECT_NAME(fk.parent_object_id) AS [Table Name]
@@ -125,7 +125,7 @@ WHERE NOT EXISTS (
 	WHERE t.type = 'U' 
 		AND t.name = OBJECT_NAME(fk.parent_object_id)
 		AND c2.name = c.name)";
-            return d.ExecuteWithResults(sql);
+            return d.ExecuteWithResults(sql).Tables[0];
         }
 
         /// <summary>
@@ -134,8 +134,8 @@ WHERE NOT EXISTS (
         /// You can easily customize this query and add/remove columns since Kankuru Datagrid autogenerate columns
         /// </summary>
         /// <param name="d">your smo database</param>
-        /// <returns>a dataset with the result of the query.</returns>
-        public static DataSet GetDuplicatedIndex(this smo.Database d)
+        /// <returns>a DataTable with the result of the query.</returns>
+        public static DataTable GetDuplicatedIndex(this smo.Database d)
         {
             string sql = @"WITH t0 AS (
 	SELECT ic.object_id
@@ -208,15 +208,15 @@ FROM t4
 WHERE o.type IN ('u' , 'v') 
 ORDER by [Table]
 	, [Index]";
-            return d.ExecuteWithResults(sql);
+            return d.ExecuteWithResults(sql).Tables[0];
         }
 
         /// <summary>
         /// Get list of Heap Indexes for the specified database
         /// </summary>
         /// <param name="d">your smo database</param>
-        /// <returns>a dataset with the result of the query.</returns>
-        public static DataSet GetHeapIndex(this smo.Database d)
+        /// <returns>a DataTable with the result of the query.</returns>
+        public static DataTable GetHeapIndex(this smo.Database d)
         {
             return d.ExecuteWithResults(@"SELECT s.name + '.' + t.name AS [Table Name]
 	, create_date AS [Create Date]
@@ -225,15 +225,15 @@ FROM sys.indexes i (NOLOCK)
 	INNER JOIN sys.tables t (NOLOCK) ON t.object_id = i.object_id
 	INNER JOIN sys.schemas s (NOLOCK) ON t.schema_id = s.schema_id
 WHERE i.[type] = 0 
-ORDER BY [Table Name]");
+ORDER BY [Table Name]").Tables[0];
         }
 
         /// <summary>
         /// Get list of Tables without Primary Key
         /// </summary>
         /// <param name="d">your smo database</param>
-        /// <returns>a dataset with the result of the query.</returns>
-        public static DataSet GetTableWithoutPK(this smo.Database d)
+        /// <returns>a DataTable with the result of the query.</returns>
+        public static DataTable GetTableWithoutPK(this smo.Database d)
         {
             return d.ExecuteWithResults(@"SELECT s.name as [Schema Name]
 	, t.name as [Table Name]
@@ -248,15 +248,15 @@ WHERE t.is_ms_shipped = 0
 			AND t.name = c.TABLE_NAME
 	)
 ORDER BY s.name
-	, t.name");
+	, t.name").Tables[0];
         }
 
         /// <summary>
         /// Get list of Tables without Clustered Index
         /// </summary>
         /// <param name="d">your smo database</param>
-        /// <returns>a dataset with the result of the query.</returns>
-        public static DataSet GetTableWithoutClusteredIndex(this smo.Database d)
+        /// <returns>a DataTable with the result of the query.</returns>
+        public static DataTable GetTableWithoutClusteredIndex(this smo.Database d)
         {
             return d.ExecuteWithResults(@"SELECT s.name AS [Schema Name]
 	, t.name AS [Table Name]
@@ -272,7 +272,7 @@ WHERE t.is_ms_shipped = 0
 			AND s.name = ss.name
 			AND t.name = st.name
 	)
-ORDER BY t.name");
+ORDER BY t.name").Tables[0];
         }
 
         /// <summary>
@@ -280,8 +280,8 @@ ORDER BY t.name");
         /// Note : these statistics are deleted when SQL Server restarts
         /// </summary>
         /// <param name="d">your smo database</param>
-        /// <returns>a dataset with the result of the query.</returns>
-        public static DataSet GetLastAccessByTable(this smo.Database d)
+        /// <returns>a DataTable with the result of the query.</returns>
+        public static DataTable GetLastAccessByTable(this smo.Database d)
         {
             return d.ExecuteWithResults(@"WITH agg as (
 	SELECT [object_id] 
@@ -330,7 +330,7 @@ INNER JOIN sys.schemas s (NOLOCK) ON t.schema_id = s.schema_id
 LEFT JOIN #TEMP temp (NOLOCK) ON t.object_id = temp.object_id
 ORDER BY [Last Access] DESC
 
-DROP TABLE #TEMP");
+DROP TABLE #TEMP").Tables[0];
         }
 
         #endregion
