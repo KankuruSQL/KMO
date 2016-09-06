@@ -475,9 +475,7 @@ HAVING SUM ([W2].[Percentage]) - MAX ([W1].[Percentage]) < 99;", sqlIgnore);
         /// <returns>a DataTable with the result of the query</returns>
         public static DataTable ReadErrorLog(this smo.Server s, DateTime startTime, DateTime endTime, int logFileNumber = 0, bool withInformationMessage = false)
         {
-            string sql = string.Format(@"DECLARE @sqlStatement NVARCHAR(1000);
-SET @sqlStatement = 'master.dbo.xp_readerrorlog {0}'
-CREATE TABLE #KMOErrorLog
+            string sql = string.Format(@"CREATE TABLE #KMOErrorLog
 (
     LogDate DATETIME
     , ProcessInfo NVARCHAR(50)
@@ -485,7 +483,7 @@ CREATE TABLE #KMOErrorLog
 )
 
 INSERT INTO #KMOErrorLog(LogDate, ProcessInfo, vchMessage)
-EXEC sp_executesql @sqlStatement
+EXEC master.dbo.xp_readerrorlog {0}
 
 DELETE FROM #KMOErrorLog 
 WHERE LogDate < '{1}'
@@ -515,8 +513,45 @@ DROP TABLE #KMOErrorLog
 
             smo.Database d = s.Databases["master"];
             return d.ExecuteWithResults(sql).Tables[0];
-
         }
+
+        /// <summary>
+        /// Get Login Failed from SQL ErrorLog
+        /// </summary>
+        /// <param name="s">Your smo Server</param>
+        /// <param name="startTime">Doesn't return events before this datetime. You could use DateTime.MinValue if you don't want to filter.</param>
+        /// <param name="endTime">Doesn't return events after this datetime. You could use DateTime.MaxValue if you don't want to filter.</param>
+        /// <param name="logNumber">The file you want to parse. File 0 by default</param>
+        /// <returns>a DataTable</returns>
+        public static DataTable GetLoginFailed(this smo.Server s, DateTime startTime, DateTime endTime, int logFileNumber = 0)
+        {
+            string sql = string.Format(@"CREATE TABLE #KMOLoginFailed
+(
+    LogDate DATETIME
+    , ProcessInfo NVARCHAR(50)
+    , vchMessage NVARCHAR(2000)
+)
+
+INSERT INTO #KMOLoginFailed(LogDate, ProcessInfo, vchMessage)
+EXEC master.dbo.xp_readerrorlog {0}
+
+SELECT LogDate
+    , ProcessInfo
+	, RTRIM(LTRIM(vchMessage)) AS [Message]
+FROM #KMOLoginFailed
+WHERE (SUBSTRING(vchMessage,1, 12) = 'Login failed'
+	OR vchMessage LIKE '%SSPI%'
+    OR processinfo = 'Logon')
+	AND logdate > '{1}'
+	AND logdate < '{2}'
+ORDER BY LogDate DESC
+
+DROP TABLE #KMOLoginFailed", logFileNumber, startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"));
+
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
         #endregion
 
     }
