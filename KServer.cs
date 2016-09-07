@@ -554,5 +554,38 @@ DROP TABLE #KMOLoginFailed", logFileNumber, startTime.ToString("yyyyMMdd HH:mm:s
 
         #endregion
 
+        #region Queries
+        /// <summary>
+        /// Get the top N stored procedures more expensive
+        /// </summary>
+        /// <param name="s">Your smo server</param>
+        /// <param name="orderQuery">With this parameter, you're able to sort the query. By default, sorted by Execution Count</param>
+        /// <param name="rowCount">Number of rows returned by the query. 50 by default</param>
+        /// <returns></returns>
+        public static DataTable GetTop50StoredProcedures(this smo.Server s, string orderQuery = "Execution Count", int rowCount = 50)
+        {
+            if (s.VersionMajor < 10)
+            {
+                throw new Exception("This feature is only available from SQL Server 2008.");
+            }
+
+            string sql = string.Format(@"SELECT TOP ({0}) CASE WHEN database_id = 32767 THEN 'ResourceDB' ELSE DB_NAME(database_id) END AS [Database]
+	, OBJECT_SCHEMA_NAME(object_id, database_id) + '.' + OBJECT_NAME(object_id,database_id) AS [Stored Procedure]
+	, cached_time AS [Cached Time]
+	, last_execution_time AS [Last Execution Time]
+	, execution_count AS [Execution Count]
+	, total_worker_time / execution_count AS [Average CPU]
+	, total_elapsed_time / execution_count AS [Average Elapsed Time]
+	, total_logical_reads / execution_count AS [Average Logical Reads]
+	, total_logical_writes / execution_count AS [Average Logical Writes]
+	, total_physical_reads  / execution_count AS [Average Physical Reads]
+FROM sys.dm_exec_procedure_stats (NOLOCK)
+ORDER BY {1} DESC", rowCount, orderQuery);
+
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        #endregion
     }
 }
