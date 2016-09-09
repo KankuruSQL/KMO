@@ -412,6 +412,25 @@ ORDER BY EventTime DESC";
         }
         #endregion
 
+        #region Memory
+        /// <summary>
+        /// Get Buffer Size by Database
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>return the result of the query in a DataTable</returns>
+        public static DataTable GetBufferByDatabase(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"SELECT CASE WHEN database_id = 32767 THEN 'Resource' ELSE DB_NAME(database_id) END AS [Database]
+	, COUNT(*) / 128 AS [Cached_Size]
+FROM sys.dm_os_buffer_descriptors (NOLOCK)
+GROUP BY database_id
+ORDER BY [Cached_Size] DESC
+OPTION (RECOMPILE)";
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+        #endregion
+
         #region Waits
         /// <summary>
         /// Get Wait statistics for an instance. Very helpful to understand performance issues

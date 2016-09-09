@@ -334,5 +334,58 @@ DROP TABLE #TEMP").Tables[0];
         }
 
         #endregion
+
+        #region Memory
+        /// <summary>
+        /// Get Buffer detail for a database. What is the memory usage by object ?
+        /// </summary>
+        /// <param name="d">your smo database</param>
+        /// <returns>DataTable with the result of the query</returns>
+        public static DataTable GetBufferStats(this smo.Database d)
+        {
+            string compression1 = "		, p.data_compression_desc AS CompressionType ";
+            string compression2 = "		, p.data_compression_desc ";
+            string compression3 = "	, cte.CompressionType AS [Compression Type]";
+            if (d.Name != null && d.Parent.VersionMajor < 10)
+            {
+                compression1 = string.Empty;
+                compression2 = string.Empty;
+                compression3 = string.Empty;
+            }
+            string sql = string.Format(@"WITH cte AS
+(
+	SELECT p.object_id
+		, p.index_id 
+		, COUNT(*) / 128 AS Buffer_size
+		, COUNT(*) AS BufferCount
+		, a.type_desc 
+		, p.rows
+		{0}
+	FROM sys.allocation_units a (NOLOCK) 
+		INNER JOIN sys.dm_os_buffer_descriptors b (NOLOCK) ON a.allocation_unit_id = b.allocation_unit_id 
+		INNER JOIN sys.partitions p (NOLOCK) ON a.container_id = p.partition_id 
+	WHERE b.database_id = CONVERT(int, DB_ID()) 
+		AND p.object_id > 100 
+	GROUP BY p.object_id
+		, p.index_id 
+		{1}
+		, a.type_desc 
+		, p.rows
+)
+SELECT OBJECT_SCHEMA_NAME(cte.object_id) + '.' + OBJECT_NAME(cte.object_id) AS [Table]
+	, i.name AS [Index]
+	, cte.Buffer_size AS [Buffer Size]
+	, cte.BufferCount AS [Buffer Count]
+	{2}
+	, cte.type_desc AS [Allocation Unit Type]
+	, cte.rows AS [Rows]
+FROM cte
+	LEFT JOIN sys.indexes i(NOLOCK) ON cte.index_id = i.index_id 
+		AND cte.object_id = i.object_id
+ORDER BY cte.BufferCount DESC", compression1, compression2, compression3);
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+        #endregion
+
     }
 }
