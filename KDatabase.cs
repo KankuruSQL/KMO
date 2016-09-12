@@ -346,7 +346,7 @@ DROP TABLE #TEMP").Tables[0];
             string compression1 = "		, p.data_compression_desc AS CompressionType ";
             string compression2 = "		, p.data_compression_desc ";
             string compression3 = "	, cte.CompressionType AS [Compression Type]";
-            if (d.Name != null && d.Parent.VersionMajor < 10)
+            if (d.Parent.VersionMajor < 10)
             {
                 compression1 = string.Empty;
                 compression2 = string.Empty;
