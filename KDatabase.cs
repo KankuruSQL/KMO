@@ -34,7 +34,8 @@ namespace KMO
         {
             string sql = string.Format(@"SELECT TOP {0} 
     CASE s.[type]
-        WHEN 'D' THEN 'Full'
+		WHEN 'D' THEN 
+			CASE WHEN s.is_snapshot = 1 THEN 'Snapshot' ELSE 'Full' END
         WHEN 'I' THEN 'Differential'
         WHEN 'L' THEN 'Transaction Log'
         ELSE 'Other' 
@@ -50,7 +51,8 @@ namespace KMO
     , CAST(s.compressed_backup_size / 1048576 as INT) as bkSizeInt
     , DATEDIFF(second, s.backup_start_date, s.backup_finish_date) TimeTakenInt
     , CASE s.[type]
-        WHEN 'D' THEN '#32FF0000'
+		WHEN 'D' THEN 
+			CASE WHEN s.is_snapshot = 1 THEN '#327AC1FF' ELSE '#32FF0000' END
         WHEN 'I' THEN '#320AFF0E'
         WHEN 'L' THEN '#32FFFF00'
         ELSE '#00000000'
