@@ -9,6 +9,59 @@ namespace KMO
 {
     public static class KServer
     {
+
+        #region General informations
+        /// <summary>
+        /// Get the machine type : this server is a physical server or a Virtual Machine ?
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>Physical, virtual or unknown</returns>
+        public static string MachineType(this smo.Server s)
+        {
+            string serverType = "Unknown";
+            smo.Database d = s.Databases["master"];
+            DataTable dt = d.ExecuteWithResults("SELECT virtual_machine_type_desc FROM sys.dm_os_sys_info").Tables[0];
+            if (dt != null && dt.Rows.Count > 0)
+            {
+                string virtualType = dt.Rows[0]["virtual_machine_type_desc"].ToString();
+                switch (virtualType)
+                {
+                    case "NONE":
+                        serverType = "Physical server";
+                        break;
+                    case "HYPERVISOR":
+                        serverType = "Virtual server";
+                        break;
+                }
+            }
+            return serverType;
+        }
+
+        /// <summary>
+        /// When Sql server service restarts, TempDB is recreated. So tempdb create date can be used to know when the server restarted.
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>the datetime when sql service restart</returns>
+        public static DateTime LastRestart(this smo.Server s)
+        {
+            return s.Databases["tempdb"].CreateDate;
+        }
+
+        /// <summary>
+        /// Get services account with status
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>a datatable with service name + service informations</returns>
+        public static DataTable ServiceStatus(this smo.Server s)
+        {
+            string sql = @"SELECT servicename
+    , service_account + ' (' + status_desc + ')' AS serviceInfo
+FROM sys.dm_server_services";
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+        #endregion
+
         #region SQL Server Versions
         /// <summary>
         /// Get Sql server version name from major and minor version
@@ -338,6 +391,77 @@ FROM sys.dm_io_virtual_file_stats(null,null) AS fs
 		AND fs.[file_id] = mf.[file_id]
 ORDER BY [Avg IO Stall ms] DESC 
 OPTION (RECOMPILE)").Tables[0];
+        }
+
+        /// <summary>
+        /// Get free disk space by logical drive. If Ole automation procedures are enable, free disk space is available in percentage.
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>datable with logical name + free disk space</returns>
+        public static DataTable GetFreeDiskSpace(this smo.Server s)
+        {
+            string sql = @"DECLARE @t TABLE(
+	drive VARCHAR(2)
+	, TotalSize BIGINT DEFAULT 0
+	, FreeSpace BIGINT)
+INSERT INTO @t(drive, FreeSpace)
+EXEC xp_fixeddrives
+SELECT drive
+	, TotalSize
+	, FreeSpace
+FROM @t";
+            if (s.Configuration.OleAutomationProceduresEnabled.RunValue == 1)
+            {
+                sql = @"SET NOCOUNT ON
+DECLARE @hr INT
+DECLARE @fso INT
+DECLARE @drive CHAR(1)
+DECLARE @odrive INT
+DECLARE @TotalSize VARCHAR(20)
+DECLARE @MB NUMERIC(18, 2)
+SET @MB = 1048576
+
+CREATE TABLE #drives(
+	drive CHAR(1) PRIMARY KEY
+	, FreeSpace INT NULL
+	, TotalSize INT NULL)
+
+INSERT #drives(drive,FreeSpace)
+EXEC master.dbo.xp_fixeddrives
+
+EXEC @hr = sp_OACreate 'Scripting.FileSystemObject', @fso OUT
+IF @hr <> 0 EXEC sp_OAGetErrorInfo @fso
+
+DECLARE dcur CURSOR LOCAL FAST_FORWARD
+FOR SELECT drive
+	FROM #drives
+	ORDER by drive
+OPEN dcur FETCH NEXT FROM dcur INTO @drive
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	EXEC @hr = sp_OAMethod @fso, 'GetDrive', @odrive OUT, @drive
+	IF @hr <> 0 EXEC sp_OAGetErrorInfo @fso
+	EXEC @hr = sp_OAGetProperty @odrive, 'TotalSize', @TotalSize OUT
+	IF @hr <> 0 EXEC sp_OAGetErrorInfo @odrive
+
+	UPDATE #drives
+		SET TotalSize = @TotalSize / @MB
+	WHERE drive = @drive
+FETCH NEXT FROM dcur INTO @drive
+END
+CLOSE dcur
+DEALLOCATE dcur
+EXEC @hr = sp_OADestroy @fso
+IF @hr <> 0 EXEC sp_OAGetErrorInfo @fso
+SELECT drive
+	, TotalSize
+	, FreeSpace
+FROM #drives
+ORDER BY drive
+DROP TABLE #drives";
+            }
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
         }
         #endregion
 
