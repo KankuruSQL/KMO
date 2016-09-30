@@ -415,5 +415,44 @@ ORDER BY user_updates DESC";
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        /// <summary>
+        /// Get missing indexes : based on missing index dmv
+        /// </summary>
+        /// <param name="d">your smo database</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetMissingIndexes(this smo.Database d)
+        {
+            string sql = @"SELECT mid.[statement] AS [Table]
+	, mid.equality_columns AS [Equality_Columns]
+	, mid.inequality_columns AS [Inequality_Columns]
+	, mid.included_columns AS [Included_Columns]
+	, migs.unique_compiles AS [Unique_Compiles]
+	, migs.last_user_seek AS [Last_User_Seek]
+	, migs.user_seeks AS [User_Seeks]
+	, ROUND(migs.avg_total_user_cost, 2) AS [Average_Total_User_Cost]
+	, migs.avg_user_impact AS [Average_User_Impact]
+	, ROUND(user_seeks * avg_total_user_cost * (avg_user_impact * 0.01), 2) AS [Index_Advantage]
+	, 'CREATE NONCLUSTERED INDEX [IX_' + OBJECT_NAME(mid.OBJECT_ID,mid.database_id) + '_'
+		+ REPLACE(REPLACE(REPLACE(ISNULL(mid.equality_columns,''),', ','_'),'[',''),']','') +
+		CASE
+		WHEN mid.equality_columns IS NOT NULL AND mid.inequality_columns IS NOT NULL THEN '_'
+		ELSE ''
+		END
+		+ REPLACE(REPLACE(REPLACE(ISNULL(mid.inequality_columns,''),', ','_'),'[',''),']','')
+		+ ']'
+		+ ' ON ' + mid.statement
+		+ ' (' + ISNULL (mid.equality_columns,'')
+		+ CASE WHEN mid.equality_columns IS NOT NULL AND mid.inequality_columns IS NOT NULL THEN ', ' ELSE
+		'' END
+		+ ISNULL (mid.inequality_columns, '')
+		+ ')'
+		+ ISNULL (' INCLUDE (' + mid.included_columns + ')', '') AS [Creation_Script]
+FROM sys.dm_db_missing_index_group_stats AS migs WITH (NOLOCK)
+    INNER JOIN sys.dm_db_missing_index_groups AS mig WITH (NOLOCK) ON migs.group_handle = mig.index_group_handle
+    INNER JOIN sys.dm_db_missing_index_details AS mid WITH (NOLOCK) ON mig.index_handle = mid.index_handle
+ORDER BY [Index_Advantage] DESC";
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
     }
 }
