@@ -389,5 +389,31 @@ ORDER BY cte.BufferCount DESC", compression1, compression2, compression3);
         }
         #endregion
 
+        /// <summary>
+        /// Get expensive indexes : when index writes are greater than reads
+        /// </summary>
+        /// <param name="d">your smo database</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetExpensiveIndexes(this smo.Database d)
+        {
+            string sql = @"SELECT sc.name + '.' + o.name AS [Table]
+	, i.name AS [Index]
+	, s.user_updates AS [User Update]
+	, s.user_seeks AS [User Seeks]
+	, s.user_scans AS [User Scans]
+	, s.user_lookups AS [User Lookups]
+	, s.user_seeks + s.user_scans + s.user_lookups AS [Total Read]
+FROM sys.indexes i (nolock)
+	INNER JOIN sys.dm_db_index_usage_stats s (nolock) ON s.[object_id] = i.[object_id]
+		AND s.index_id = i.index_id
+	INNER JOIN sys.objects o ON i.object_id = o.object_id
+	INNER JOIN sys.schemas sc ON o.schema_id = sc.schema_id
+WHERE OBJECTPROPERTY(i.[object_id], 'ismsshipped') = 0
+	AND i.name IS NOT NULL
+	AND s.user_updates > (user_seeks + user_scans + user_lookups)
+ORDER BY user_updates DESC";
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
     }
 }
