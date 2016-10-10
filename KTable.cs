@@ -1,8 +1,10 @@
-﻿ using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Data;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using smo = Microsoft.SqlServer.Management.Smo;
 
 namespace KMO
@@ -599,5 +601,59 @@ GO
 
         #endregion
 
+        /// <summary>
+        /// Compare 2 schema Tables
+        /// </summary>
+        /// <param name="sp1">your first smo Table</param>
+        /// <param name="sp2">your second smo Table</param>
+        /// <param name="checkComments">True if you want to compare comments</param>
+        /// <param name="checkBrackets">True if you want to compare scripts with brackets</param>
+        /// <param name="ignoreCaseSensitive">True if you want to ignore Case Sensitive. False if Case sensitive</param>
+        /// <returns></returns>
+        public static KMOCompareInfo CompareSchema(this smo.Table t1, smo.Table t2, bool checkComments = false, bool checkBrackets = false, bool ignoreCaseSensitive = true)
+        {
+            smo.ScriptingOptions so = new smo.ScriptingOptions();
+            so.DriAll = true;
+            string s1 = String.Join(Environment.NewLine, t1.Script(so).Cast<String>().Select(s => s.ToString()).AsEnumerable());
+            string s2 = String.Join(Environment.NewLine, t2.Script(so).Cast<String>().Select(s => s.ToString()).AsEnumerable());
+            string message = string.Empty;
+            if (t1.Columns.Count != t2.Columns.Count)
+            {
+                message += "Tables don't have the same column count. ";
+            }
+            foreach (smo.Column c1 in t1.Columns)
+            {
+                smo.Column c2 = t2.Columns[c1.Name];
+                if (c2 == null)
+                {
+                    message += "The column " + c1.Name + " doesn't exist in the second table. ";
+                }
+                else if (c2.DataType.Name != c1.DataType.Name || c2.DataType.NumericPrecision != c1.DataType.NumericPrecision || c2.DataType.NumericScale != c1.DataType.NumericScale)
+                {
+                    message += "The column " + c1.Name + " doesn't have the same type. ";
+                }
+            }
+            foreach (smo.Column c2 in t2.Columns)
+            {
+                smo.Column c1 = t1.Columns[c2.Name];
+                if (c1 == null)
+                {
+                    message += "The column " + c2.Name + " doesn't exist in the first table. ";
+                }
+            }
+            if (message != string.Empty)
+            {
+                return new KMOCompareInfo { IsIdentical = false, Message = message, Script1 = s1, Script2 = s2 };
+            }
+
+            if (KMOCompareHelper.CompareScript(s1, s2, ignoreCaseSensitive, checkComments, checkBrackets))
+            {
+                return new KMOCompareInfo { IsIdentical = true, Message = string.Empty, Script1 = s1, Script2 = s2 };
+            }
+            else
+            {
+                return new KMOCompareInfo { IsIdentical = false, Message = "Script difference", Script1 = s1, Script2 = s2 };
+            }
+        }
     }
 }

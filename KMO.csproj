@@ -52,12 +52,17 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="KMOCompareHelper.cs" />
+    <Compile Include="KMOCompareInfo.cs" />
     <Compile Include="KDatabase.cs" />
     <Compile Include="KDataType.cs" />
     <Compile Include="KServer.cs" />
+    <Compile Include="KStoredProcedure.cs" />
     <Compile Include="KTable.cs" />
+    <Compile Include="KView.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
