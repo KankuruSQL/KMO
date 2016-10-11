@@ -191,6 +191,7 @@ ORDER BY blocking_session_id DESC
 	, RTRIM(sp.loginame) AS [Login Name]
 	, RTRIM(sp.nt_domain) AS [NT Domain]
 	, RTRIM(sp.nt_username) AS [NT Username]
+    , ec.auth_scheme AS [Auth protocol]
 	, sp.waittime AS [Wait Time]
 	, RTRIM(sp.lastwaittype) AS [Last Wait Type]
 	, sp.cpu as [CPU]
@@ -210,6 +211,7 @@ FROM master.dbo.sysprocesses sp
 	LEFT JOIN master.dbo.sysdatabases d ON sp.dbid = d.dbid
 	LEFT JOIN master.dbo.sysusers u ON sp.uid = u.uid
 	LEFT JOIN master.dbo.sysprocesses sp2 ON sp.spid = sp2.blocked
+    LEFT JOIN sys.dm_exec_connections ec ON sp.spid = ec.session_id AND ec.parent_connection_id IS NULL
 ORDER BY sp.blocked
     , d.name
     , sp.cpu DESC").Tables[0];
