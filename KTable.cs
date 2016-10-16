@@ -21,7 +21,7 @@ namespace KMO
         /// <param name="t" value="A SMO table"></param>
         /// <param name="header" value="Your custom header" remarks="Can be empty if you don't need header"></param>
         /// <returns>Return the DDL script</returns>
-        public static string ScriptProcedureList(this smo.Table t, string header = "")
+        public static string ScriptProcedureList(this smo.Table t, string header = "", bool setNoCount = true)
         {
             string create = @"CREATE PROCEDURE [{0}].[{1}_List] 
 AS ";
@@ -31,6 +31,10 @@ AS ";
                 sb.AppendLine(header);
             }
             sb.AppendLine(string.Format(create, t.Schema, t.Name));
+            if (setNoCount)
+            {
+                sb.AppendLine("SET NOCOUNT ON");
+            }
             IEnumerable<string> columns = t.Columns.Cast<smo.Column>()
                 .Select(c => string.Format("[{0}]", c.Name)).AsEnumerable();
             string column = string.Join("\r\n\t, ", columns);
@@ -47,7 +51,7 @@ AS ";
         /// <param name="t" value="A SMO table"></param>
         /// <param name="header" value="Your custom header" remarks="Can be empty if you don't need header"></param>
         /// <returns>Return the DDL script</returns>
-        public static string ScriptProcedureSelect(this smo.Table t, string header = "")
+        public static string ScriptProcedureSelect(this smo.Table t, string header = "", bool setNoCount = true)
         {
             smo.Server s = t.Parent.Parent;
             s.SetDefaultInitFields(typeof(Microsoft.SqlServer.Management.Smo.Column), true);
@@ -86,6 +90,10 @@ AS ";
                     sb.AppendLine(header);
                 }
                 sb.Append(string.Format(create, t.Schema, t.Name, sbParam.ToString()));
+                if (setNoCount)
+                {
+                    sb.AppendLine("SET NOCOUNT ON");
+                }
                 sb.AppendLine(string.Format("SELECT {0}", column.ToString()));
                 sb.AppendLine(string.Format("FROM [{0}].[{1}]", t.Schema, t.Name));
                 sb.Append(string.Format("WHERE {0}", sbWhere.ToString()));
@@ -106,7 +114,7 @@ AS ";
         /// <param name="t" value="A SMO table"></param>
         /// <param name="header" value="Your custom header" remarks="Can be empty if you don't need header"></param>
         /// <returns>Return the DDL script</returns>
-        public static string ScriptProcedureDelete(this smo.Table t, string header = "")
+        public static string ScriptProcedureDelete(this smo.Table t, string header = "", bool setNoCount = true)
         {
             smo.Server s = t.Parent.Parent;
             s.SetDefaultInitFields(typeof(Microsoft.SqlServer.Management.Smo.Column), true);
@@ -139,6 +147,10 @@ AS ";
                     sb.AppendLine(header);
                 }
                 sb.AppendLine(string.Format(create, t.Schema, t.Name, sbParam.ToString()));
+                if (setNoCount)
+                {
+                    sb.AppendLine("SET NOCOUNT ON");
+                }
                 sb.AppendLine(string.Format("DELETE FROM [{0}].[{1}]", t.Schema, t.Name));
                 sb.Append(string.Format("WHERE {0}", sbWhere.ToString()));
                 sb.AppendLine("GO");
@@ -158,7 +170,7 @@ AS ";
         /// <param name="t" value="A SMO table"></param>
         /// <param name="header" value="Your custom header" remarks="Can be empty if you don't need header"></param>
         /// <returns>Return the DDL script</returns>
-        public static string ScriptProcedureUpdate(this smo.Table t, string header = "")
+        public static string ScriptProcedureUpdate(this smo.Table t, string header = "", bool setNoCount = true)
         {
             smo.Server s = t.Parent.Parent;
             s.SetDefaultInitFields(typeof(Microsoft.SqlServer.Management.Smo.Column), true);
@@ -212,6 +224,10 @@ AS ";
                     sb.AppendLine(header);
                 }
                 sb.AppendLine(string.Format(create, t.Schema, t.Name, sbParam.ToString()));
+                if (setNoCount)
+                {
+                    sb.AppendLine("SET NOCOUNT ON");
+                }
                 sb.Append(string.Format("UPDATE [{0}].[{1}]", t.Schema, t.Name));
                 sb.Append(string.Format("SET {0}", sbSet.ToString()));
                 sb.Append(string.Format("WHERE {0}", sbWhere.ToString()));
@@ -232,7 +248,7 @@ AS ";
         /// <param name="t" value="A SMO table"></param>
         /// <param name="header" value="Your custom header" remarks="Can be empty if you don't need header"></param>
         /// <returns>Return the DDL script</returns>
-        public static string ScriptProcedureInsert(this smo.Table t, string header = "")
+        public static string ScriptProcedureInsert(this smo.Table t, string header = "", bool setNoCount = true)
         {
             smo.Server s = t.Parent.Parent;
             s.SetDefaultInitFields(typeof(Microsoft.SqlServer.Management.Smo.Column), true);
@@ -268,6 +284,10 @@ AS ";
                     sb.AppendLine(header);
                 }
                 sb.AppendLine(string.Format(create, t.Schema, t.Name, sbParam.ToString()));
+                if (setNoCount)
+                {
+                    sb.AppendLine("SET NOCOUNT ON");
+                }
                 sb.AppendLine(string.Format("INSERT INTO [{0}].[{1}]", t.Schema, t.Name));
                 sb.AppendLine(string.Format("({0})", sbColumn.ToString()));
                 sb.AppendLine(string.Format("values({0})", sbValues.ToString()));
@@ -288,7 +308,7 @@ AS ";
         /// <param name="t" value="A SMO table"></param>
         /// <param name="header" value="Your custom header" remarks="Can be empty if you don't need header"></param>
         /// <returns>Return the DDL script</returns>
-        public static string ScriptProcedureSelectWithTVP(this smo.Table t, string header = "")
+        public static string ScriptProcedureSelectWithTVP(this smo.Table t, string header = "", bool setNoCount = true)
         {
             smo.Server s = t.Parent.Parent;
             s.SetDefaultInitFields(typeof(Microsoft.SqlServer.Management.Smo.Column), true);
@@ -339,6 +359,10 @@ GO
                     sb.AppendLine(header);
                 }
                 sb.Append(string.Format(create, t.Schema, t.Name, sbParam.ToString()));
+                if (setNoCount)
+                {
+                    sb.AppendLine("SET NOCOUNT ON");
+                }
                 sb.AppendLine(string.Format("SELECT {0}", column));
                 sb.AppendLine(string.Format("FROM [{0}].[{1}] a", t.Schema, t.Name));
                 sb.AppendLine(string.Format("WHERE EXISTS (SELECT * FROM @TVP b WHERE {0})", sbWhere.ToString()));
