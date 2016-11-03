@@ -21,6 +21,100 @@ namespace KMO
             DataSet ds = d.ExecuteWithResults(sql);
             return (ds.Tables[0].Rows.Count == 1);
         }
+
+        /// <summary>
+        /// Get replication details (command delivered/undelivered) by publication, subscriber
+        /// Must be executed on distribution db
+        /// </summary>
+        /// <param name="d">Your smo database (distribution)</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetReplicationDetails(this smo.Database d)
+        {
+            DataTable dt = new DataTable();
+            if (d.IsDistributor())
+            {
+                string sql = @"SELECT SUM(ds.UndelivCmdsInDistDB) AS [Undelivered]
+    , SUM(ds.DelivCmdsInDistDB) AS [Delivered]
+    , ss.name AS [Subscriber]
+    , sp.name AS [Publisher]
+    , da.publication AS [Publication]
+    , da.publisher_db AS [Database]
+    , da.name AS [Agent]
+FROM dbo.MSdistribution_agents da WITH (READUNCOMMITTED)
+    INNER JOIN sys.servers sp WITH (READUNCOMMITTED)
+        ON sp.server_id = da.publisher_id
+    INNER JOIN sys.servers ss WITH (READUNCOMMITTED)
+        ON ss.server_id = da.subscriber_id
+    INNER JOIN dbo.MSdistribution_status ds WITH (READUNCOMMITTED)
+        ON ds.agent_id = da.id
+GROUP BY
+    sp.name
+    , ss.name
+    , da.name
+    , da.id
+    , da.publication
+    , da.publisher_db
+ORDER BY undelivered DESC
+	, delivered DESC";
+                dt = d.ExecuteWithResults(sql).Tables[0];
+            }
+            return dt;
+        }
+
+        /// <summary>
+        /// Get average latency/rate history from distribution database, group by 10 minutes
+        /// </summary>
+        /// <param name="d">Your smo database (distribution)</param>
+        /// <param name="startDate">Start DateTime</param>
+        /// <param name="endDate">End DateTime</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetReplicationLatencyStats(this smo.Database d, DateTime startDate, DateTime endDate)
+        {
+            DataTable dt = new DataTable();
+            if (d.IsDistributor())
+            {
+                string sql = string.Format(@"IF EXISTS(SELECT * FROM sys.objects WHERE name = 'MSdistribution_history')
+BEGIN
+    SELECT CONVERT(CHAR(15), time, 121) + '0:00' dt
+        , ROUND(AVG(current_delivery_latency), 0) AS [Average Delivery Latency]
+        , ROUND(AVG(current_delivery_rate), 0) [Average Delivery Rate]
+        , db_name() as [Database]
+    FROM dbo.MSdistribution_history WITH (READUNCOMMITTED)
+    WHERE current_delivery_latency > 0
+        AND time BETWEEN '{0}' AND '{1}'
+    GROUP BY CONVERT(CHAR(15), time, 121) + '0:00'
+    ORDER BY dt DESC
+END", startDate.ToString("yyyyMMdd hh:mm:ss"), endDate.ToString("yyyyMMdd hh:mm:ss"));
+                dt = d.ExecuteWithResults(sql).Tables[0];
+            }
+            return dt;
+        }
+
+        /// <summary>
+        /// get error from distribution
+        /// </summary>
+        /// <param name="d">your smo distribution database</param>
+        /// <param name="startDate"></param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetReplicationErrorLog(this smo.Database d, DateTime startDate)
+        {
+            DataTable dt = new DataTable();
+            if (d.IsDistributor())
+            {
+                string sql = string.Format(@"IF EXISTS(SELECT * FROM sys.objects WHERE name = 'MSrepl_errors')
+BEGIN
+    SELECT TOP 10000 DB_NAME() [Database]
+	    ,  [time]
+	    , source_name AS [Source Name]
+	    , error_text AS [Error Text]
+    FROM dbo.MSrepl_errors WITH (READUNCOMMITTED)
+    WHERE [time] >= '{0}'
+    order by time desc
+END", startDate.ToString("yyyyMMdd hh:mm:ss"));
+                dt = d.ExecuteWithResults(sql).Tables[0];
+            }
+            return dt;
+        }
         #endregion
 
         #region Backups
@@ -389,6 +483,7 @@ ORDER BY cte.BufferCount DESC", compression1, compression2, compression3);
         }
         #endregion
 
+        #region Indexes
         /// <summary>
         /// Get expensive indexes : when index writes are greater than reads
         /// </summary>
@@ -453,6 +548,7 @@ FROM sys.dm_db_missing_index_group_stats AS migs WITH (NOLOCK)
 ORDER BY [Index_Advantage] DESC";
             return d.ExecuteWithResults(sql).Tables[0];
         }
+        #endregion
 
     }
 }
