@@ -381,13 +381,16 @@ DROP TABLE #TMPLASTFILECHANGE
 	, mf.physical_name AS [Physical Name]
 	, io_stall_read_ms AS [IO Stall Read ms]
 	, num_of_reads AS [Num of Reads]
-	, CAST(io_stall_read_ms/(1.0 + num_of_reads) AS NUMERIC(10,1)) AS [Avg Read Stall ms]
+	, CASE WHEN num_of_reads = 0 THEN 0
+		ELSE CAST(io_stall_read_ms / num_of_reads AS NUMERIC(10,1)) END AS [Avg Read Stall ms]
 	, io_stall_write_ms AS [IO Stall Write ms]
 	, num_of_writes AS [Num of Writes]
-	, CAST(io_stall_write_ms/(1.0+num_of_writes) AS NUMERIC(10,1)) AS [Avg Write Stall ms]
+	, CASE WHEN num_of_writes = 0 THEN 0
+		ELSE CAST(io_stall_write_ms / num_of_writes AS NUMERIC(10,1)) END AS [Avg Write Stall ms]
 	, io_stall_read_ms + io_stall_write_ms AS [IO Stalls]
 	, num_of_reads + num_of_writes AS [Total IO]
-	, CAST((io_stall_read_ms + io_stall_write_ms)/(1.0 + num_of_reads + num_of_writes) AS NUMERIC(10,1)) AS [Avg IO Stall ms]
+	, CASE WHEN (num_of_reads + num_of_writes) = 0 THEN 0
+		ELSE CAST((io_stall_read_ms + io_stall_write_ms)/(num_of_reads + num_of_writes) AS NUMERIC(10,1)) END AS [Avg IO Stall ms]
 FROM sys.dm_io_virtual_file_stats(null,null) AS fs 
 	INNER JOIN sys.master_files AS mf (NOLOCK) ON fs.database_id = mf.database_id 
 		AND fs.[file_id] = mf.[file_id]
