@@ -761,5 +761,124 @@ ORDER BY {1} DESC", rowCount, orderQuery);
         }
 
         #endregion
+
+        #region TempDB
+        /// <summary>
+        /// Get list of tempdb files + io statistics
+        /// </summary>
+        /// <param name="s">Your smo server</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetTempDBFiles(this smo.Server s)
+        {
+            string sql = @"SELECT DB_NAME(fs.database_id) AS [Database Name]
+	, mf.name AS [Logical Name]
+    , mf.physical_name AS [Physical Name]
+	, type_desc
+	, size * 1024 / 128 AS [Size]
+	, CASE WHEN is_percent_growth = 1 THEN max_size ELSE CASE WHEN max_size = -1 THEN max_size ELSE max_size * 1024 / 128 END END AS [Max Size]
+	, CASE WHEN is_percent_growth = 1 THEN growth ELSE growth * 1024 / 128 END AS [Growth]
+	, is_percent_growth AS [Is Percent Growth]
+	, CASE WHEN num_of_reads = 0 THEN 0 
+		ELSE CAST(io_stall_read_ms/num_of_reads AS NUMERIC(10,1)) 
+		END AS [Avg Read latency ms]
+	, CASE WHEN num_of_writes = 0 THEN 0 
+		ELSE CAST(io_stall_write_ms/num_of_writes AS NUMERIC(10,1)) 
+		END AS [Avg Write latency ms]
+	, CASE WHEN (num_of_reads + num_of_writes) = 0 THEN 0 
+		ELSE CAST((io_stall_read_ms + io_stall_write_ms)/(num_of_reads + num_of_writes) AS NUMERIC(10,1)) 
+		END AS [Avg IO latency ms]
+FROM sys.dm_io_virtual_file_stats(null,null) AS fs 
+	INNER JOIN sys.master_files AS mf (NOLOCK) ON fs.database_id = mf.database_id 
+		AND fs.[file_id] = mf.[file_id]
+WHERE DB_NAME(fs.database_id) = 'tempdb'";
+            smo.Database d = s.Databases["tempdb"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        /// <summary>
+        /// Get space usage from tempdb
+        /// This method is inspired by the session of David Barbarin https://youtu.be/7yZ23zy80zU
+        /// </summary>
+        /// <param name="s">Your smo server</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetTempDBSpaceUsage(this smo.Server s)
+        {
+            string sql = @"SELECT SUM(user_object_reserved_page_count) / 128.0 AS [User Object pages in MB]
+	, SUM(internal_object_reserved_page_count) / 128.0 AS [Internal object pages in MB]
+	, SUM(unallocated_extent_page_count) / 128.0 AS [Free space in MB]
+FROM tempdb.sys.dm_db_file_space_usage";
+            smo.Database d = s.Databases["tempdb"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        /// <summary>
+        /// Get task space usage in tempdb from the DMV dm_db_task_space_usage.
+        /// With this method, you can find which query is using tempdb
+        /// This method is inspired by the session of David Barbarin https://youtu.be/7yZ23zy80zU
+        /// </summary>
+        /// <param name="s">Your smo server</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetTempDBTaskSpaceUsage(this smo.Server s)
+        {
+            string sql = @"WITH all_request_usage
+AS
+(
+	SELECT session_id
+		, request_id
+		, SUM(internal_objects_alloc_page_count) AS request_internal_objects_alloc_page_count
+		, SUM(internal_objects_dealloc_page_count) AS request_internal_objects_dealloc_page_count
+		, SUM(user_objects_alloc_page_count) AS request_user_objects_alloc_page_count
+		, SUM(user_objects_dealloc_page_count) AS request_user_objects_dealloc_page_count
+	FROM tempdb.sys.dm_db_task_space_usage
+	WHERE session_id >= 50
+		AND session_id <> @@SPID
+	GROUP BY session_id
+		, request_id
+	HAVING (SUM(internal_objects_alloc_page_count)
+		+ SUM(internal_objects_dealloc_page_count)
+		+ SUM(user_objects_alloc_page_count)
+		+ SUM(user_objects_dealloc_page_count)) > 0
+)
+SELECT R1.session_id AS [Session Id]
+	, R1.request_internal_objects_alloc_page_count AS [Request Internal Objects Alloc Page Count]
+	, R1.request_internal_objects_dealloc_page_count AS [Request Internal Objects Dealloc Page Count]
+	, R1.request_user_objects_alloc_page_count AS [Request User Objects Alloc Page Count]
+	, R1.request_user_objects_dealloc_page_count AS [Request User Objects Dealloc Page Count]
+	, T.text AS [Query]
+FROM all_request_usage R1
+	INNER JOIN tempdb.sys.dm_exec_requests R2 ON R1.session_id = R2.session_id
+		AND R1.request_id = R2.request_id
+	OUTER APPLY tempdb.sys.dm_exec_sql_text(R2.sql_handle) T";
+            smo.Database d = s.Databases["tempdb"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        /// <summary>
+        /// From the default trace, get the last Sort Warning in tempdb
+        /// This method is inspired by the session of David Barbarin https://youtu.be/7yZ23zy80zU
+        /// </summary>
+        /// <param name="s">Your smo server</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetTempDBSortWarning(this smo.Server s)
+        {
+            string sql = @"DECLARE @path NVARCHAR(520)
+SELECT @path = path FROM sys.traces WHERE id = 1
+
+SELECT TOP 1000 t.StartTime AS [Start Time]
+    , v.subclass_name AS [Subclass Name]
+	, t.DatabaseName AS [Database]
+	, t.LoginName
+	, t.ApplicationName AS [Application Name]
+FROM fn_trace_gettable(@path, default) t
+	INNER JOIN sys.trace_events te ON t.EventClass = te.trace_event_id
+	INNER JOIN sys.trace_subclass_values v ON t.EventSubClass = v.subclass_value
+		AND t.EventClass = v.trace_event_id
+WHERE te.name = 'Sort Warnings'
+ORDER BY t.StartTime DESC";
+            smo.Database d = s.Databases["tempdb"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        #endregion
     }
 }
