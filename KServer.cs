@@ -262,6 +262,52 @@ FROM sys.server_role_members AS srm (NOLOCK)
 WHERE rol.name = 'sysadmin'
 ORDER BY mem.name").Tables[0];
         }
+
+        /// <summary>
+        /// Get session statistics by login
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>the result of the query</returns>
+        public static DataTable GetLoginStats(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(@"SELECT login_name AS [Login Name]
+    , COUNT(session_id) AS [session Count]
+    , SUM(cpu_time) AS [Cpu Time]
+    , SUM(memory_usage) AS [Memory Usage]
+    , SUM(logical_reads) AS [Logical Reads]
+    , SUM(writes) AS [Writes]
+FROM sys.dm_exec_sessions (NOLOCK)
+GROUP BY login_name
+ORDER BY COUNT(session_id) DESC").Tables[0];
+        }
+
+        /// <summary>
+        /// Get connections by client
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>the result of the query</returns>
+        public static DataTable GetLoginConnections(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(@"SELECT es.host_name AS [Host Name]
+	, ec.client_net_address AS [Client Net Address]
+	, es.program_name AS [Program Name]
+	, es.login_name AS [Login Name]
+	, ec.auth_scheme AS [Auth Schema]
+	, ec.net_transport AS [Net Transport]
+	, COUNT(*) AS [Session Count]
+FROM sys.dm_exec_sessions es (NOLOCK)
+	INNER JOIN sys.dm_exec_connections ec (NOLOCK) ON es.session_id = ec.session_id
+GROUP BY es.[host_name]
+	, ec.client_net_address
+	, es.[program_name]
+	, es.login_name
+	, ec.auth_scheme
+	, ec.net_transport
+ORDER BY ec.client_net_address
+	, es.[program_name]").Tables[0];
+        }
         #endregion
 
         #region Disk
