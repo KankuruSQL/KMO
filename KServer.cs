@@ -823,9 +823,9 @@ ORDER BY {1} DESC", rowCount, orderQuery);
 	, mf.name AS [Logical Name]
     , mf.physical_name AS [Physical Name]
 	, type_desc
-	, size * 1024 / 128 AS [Size]
-	, CASE WHEN is_percent_growth = 1 THEN max_size ELSE CASE WHEN max_size = -1 THEN max_size ELSE max_size * 1024 / 128 END END AS [Max Size]
-	, CASE WHEN is_percent_growth = 1 THEN growth ELSE growth * 1024 / 128 END AS [Growth]
+	, CAST(size AS BIGINT) * 1024 / 128 AS [Size]
+	, CASE WHEN is_percent_growth = 1 THEN max_size ELSE CASE WHEN max_size = -1 THEN CAST(max_size AS BIGINT) ELSE CAST(max_size AS BIGINT) * 1024 / 128 END END AS [Max Size]
+	, CASE WHEN is_percent_growth = 1 THEN CAST(growth AS BIGINT) ELSE CAST(growth AS BIGINT) * 1024 / 128 END AS [Growth]
 	, is_percent_growth AS [Is Percent Growth]
 	, CASE WHEN num_of_reads = 0 THEN 0 
 		ELSE CAST(io_stall_read_ms/num_of_reads AS NUMERIC(10,1)) 
