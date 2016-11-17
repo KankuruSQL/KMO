@@ -73,6 +73,9 @@ FROM sys.dm_server_services";
             string version;
             switch (s.VersionMajor.ToString() + "." + s.VersionMinor.ToString())
             {
+                case "14.0":
+                    version = "Sql Server VNext";
+                    break;
                 case "13.0":
                     version = "Sql Server 2016";
                     break;
