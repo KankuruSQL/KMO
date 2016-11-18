@@ -220,6 +220,34 @@ ORDER BY sp.blocked
     , sp.cpu DESC").Tables[0];
         }
 
+        /// <summary>
+        /// Get Stored procedures execution statistics.
+        /// Useful to calculate diff statistics like in Live SP Profiler in Kankuru
+        /// </summary>
+        /// <param name="s">SMO server</param>
+        /// <returns>a DataTable</returns>
+        public static DataTable GetLiveSPProfiler(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string _sql = @"SELECT database_id AS [Database ID]
+	, DB_NAME(database_id) AS [Database Name]
+	, object_id AS [Object ID]
+	, OBJECT_NAME(object_id, database_id) AS [Object Name]
+	, plan_handle AS [Plan Handle]
+	, SUM(total_worker_time) AS [Cpu]
+	, SUM(total_elapsed_time) AS [Elapsed Time]
+	, SUM(execution_count) AS [Execution Count]
+	, SUM(total_logical_reads) AS [Logical Reads]
+	, SUM(total_physical_reads) AS [Physical Reads]
+	, SUM(total_logical_writes) AS [Logical Writes]
+FROM sys.dm_exec_procedure_stats
+WHERE database_id != 32767
+GROUP BY database_id
+	, object_id
+	, plan_handle";
+            return d.ExecuteWithResults(_sql).Tables[0];
+        }
+
         #endregion
 
         #region Backups
