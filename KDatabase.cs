@@ -429,6 +429,71 @@ ORDER BY [Last Access] DESC
 DROP TABLE #TEMP").Tables[0];
         }
 
+        /// <summary>
+        /// Find all columns in a database with the same name but with different datatype
+        /// </summary>
+        /// <param name="d">your smo Database</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetColumnWithSameNameButDifferentType(this smo.Database d)
+        {
+            string _sql = @"SELECT DISTINCT columnName AS [Column Name]
+FROM
+(
+	SELECT ss.columnName
+		, ss.typeName
+		, ss.max_length
+		, ss.precision
+		, SUM(ss.nb) AS sumnb
+		, ROW_NUMBER() OVER (PARTITION BY ss.columnName ORDER BY ss.columnName) AS rid
+	FROM
+	(
+		SELECT c.name AS columnName
+			, ty.name AS typeName
+			, c.max_length
+			, c.precision
+			, COUNT(*) AS nb
+		FROM sys.columns c (NOLOCK)
+			INNER JOIN sys.tables t (NOLOCK) on c.object_id = t.object_id
+			INNER JOIN sys.types ty (NOLOCK) on c.user_type_id = ty.user_type_id
+		GROUP BY c.name
+			, ty.name
+			, c.max_length
+			, c.precision
+	)ss
+	GROUP BY ss.columnName
+		, ss.typeName
+		, ss.max_length
+		, ss.precision
+)sss
+WHERE rid > 1
+ORDER BY sss.columnName";
+            return d.ExecuteWithResults(_sql).Tables[0];
+        }
+
+        /// <summary>
+        /// Get all column occurences in a database for a given column name.
+        /// </summary>
+        /// <param name="d">your smo database</param>
+        /// <param name="column">Datatable</param>
+        /// <returns></returns>
+        public static DataTable GetAllColumnsWithName(this smo.Database d, string column)
+        {
+            string _sql = string.Format(@"SELECT s.name + '.' + t.name AS tablename
+	, ty.name AS typeName
+	, c.max_length
+	, c.precision
+FROM sys.columns c (NOLOCK)
+	INNER JOIN sys.tables t (NOLOCK) ON c.object_id = t.object_id
+    INNER JOIN sys.schemas s (NOLOCK) ON t.schema_id = s.schema_id
+	INNER JOIN sys.types ty (NOLOCK) ON c.user_type_id = ty.user_type_id
+WHERE c.name = '{0}'
+ORDER BY typeName
+	, c.max_length
+	, c.precision
+	, t.name", column);
+            return d.ExecuteWithResults(_sql).Tables[0];
+        }
+
         #endregion
 
         #region Memory
