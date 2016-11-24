@@ -515,34 +515,33 @@ ORDER BY typeName
             }
             string sql = string.Format(@"WITH cte AS
 (
-	SELECT p.object_id
-		, p.index_id 
-		, COUNT(*) / 128 AS Buffer_size
-		, COUNT(*) AS BufferCount
-		, a.type_desc 
-		, p.rows
-		{0}
-	FROM sys.allocation_units a (NOLOCK) 
-		INNER JOIN sys.dm_os_buffer_descriptors b (NOLOCK) ON a.allocation_unit_id = b.allocation_unit_id 
-		INNER JOIN sys.partitions p (NOLOCK) ON a.container_id = p.partition_id 
-	WHERE b.database_id = CONVERT(int, DB_ID()) 
-		AND p.object_id > 100 
-	GROUP BY p.object_id
-		, p.index_id 
-		{1}
-		, a.type_desc 
-		, p.rows
+    SELECT p.object_id
+        , p.index_id
+        , COUNT(*) / 128 AS Buffer_size
+        , COUNT(*) AS BufferCount
+        , a.type_desc
+        , p.rows
+        {0}
+    FROM sys.dm_os_buffer_descriptors b  (NOLOCK)
+        LEFT JOIN sys.allocation_units a (NOLOCK) ON a.allocation_unit_id = b.allocation_unit_id
+        LEFT JOIN sys.partitions p (NOLOCK) ON a.container_id = p.partition_id
+    WHERE b.database_id = CONVERT(int, DB_ID())
+    GROUP BY p.object_id
+        , p.index_id
+        {1}
+        , a.type_desc
+        , p.rows
 )
-SELECT OBJECT_SCHEMA_NAME(cte.object_id) + '.' + OBJECT_NAME(cte.object_id) AS [Table]
-	, i.name AS [Index]
-	, cte.Buffer_size AS [Buffer Size]
-	, cte.BufferCount AS [Buffer Count]
-	{2}
-	, cte.type_desc AS [Allocation Unit Type]
-	, cte.rows AS [Rows]
+SELECT COALESCE(COALESCE(OBJECT_SCHEMA_NAME(cte.object_id), '') + '.' + OBJECT_NAME(cte.object_id), 'Unused') AS [Table]
+    , i.name AS [Index]
+    , cte.Buffer_size AS [Buffer Size]
+    , cte.BufferCount AS [Buffer Count]
+    {2}
+    , cte.type_desc AS [Allocation Unit Type]
+    , cte.rows AS [Rows]
 FROM cte
-	LEFT JOIN sys.indexes i(NOLOCK) ON cte.index_id = i.index_id 
-		AND cte.object_id = i.object_id
+    LEFT JOIN sys.indexes i(NOLOCK) ON cte.index_id = i.index_id
+        AND cte.object_id = i.object_id
 ORDER BY cte.BufferCount DESC", compression1, compression2, compression3);
             return d.ExecuteWithResults(sql).Tables[0];
         }
