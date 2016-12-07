@@ -76,8 +76,8 @@ ORDER BY undelivered DESC
                 string sql = string.Format(@"IF EXISTS(SELECT * FROM sys.objects WHERE name = 'MSdistribution_history')
 BEGIN
     SELECT CONVERT(CHAR(15), time, 121) + '0:00' dt
-        , ROUND(AVG(current_delivery_latency), 0) AS [Average Delivery Latency]
-        , ROUND(AVG(current_delivery_rate), 0) [Average Delivery Rate]
+        , ROUND(AVG(CAST(current_delivery_latency AS bigint)), 0) AS [Average Delivery Latency]
+        , ROUND(AVG(CAST(current_delivery_rate AS bigint)), 0) [Average Delivery Rate]
         , db_name() as [Database]
     FROM dbo.MSdistribution_history WITH (READUNCOMMITTED)
     WHERE current_delivery_latency > 0
