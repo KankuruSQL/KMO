@@ -233,7 +233,7 @@ ORDER BY sp.blocked
 	, DB_NAME(database_id) AS [Database Name]
 	, object_id AS [Object ID]
 	, OBJECT_NAME(object_id, database_id) AS [Object Name]
-	, plan_handle AS [Plan Handle]
+	--, plan_handle AS [Plan Handle]
 	, SUM(total_worker_time) AS [Cpu]
 	, SUM(total_elapsed_time) AS [Elapsed Time]
 	, SUM(execution_count) AS [Execution Count]
@@ -244,7 +244,7 @@ FROM sys.dm_exec_procedure_stats
 WHERE database_id != 32767
 GROUP BY database_id
 	, object_id
-	, plan_handle";
+	--, plan_handle";
             return d.ExecuteWithResults(_sql).Tables[0];
         }
 
