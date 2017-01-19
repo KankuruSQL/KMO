@@ -20,7 +20,14 @@ namespace KMO
         {
             string serverType = "Unknown";
             smo.Database d = s.Databases["master"];
-            DataTable dt = d.ExecuteWithResults("SELECT virtual_machine_type_desc FROM sys.dm_os_sys_info").Tables[0];
+            string sql = @"IF EXISTS(SELECT *
+FROM sys.all_columns
+WHERE name = 'virtual_machine_type_desc'
+	AND OBJECT_NAME(object_id) = 'dm_os_sys_info')
+BEGIN
+	SELECT virtual_machine_type_desc FROM sys.dm_os_sys_info
+END";
+            DataTable dt = d.ExecuteWithResults(sql).Tables[0];
             if (dt != null && dt.Rows.Count > 0)
             {
                 string virtualType = dt.Rows[0]["virtual_machine_type_desc"].ToString();
