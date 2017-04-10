@@ -67,6 +67,23 @@ FROM sys.dm_server_services";
             smo.Database d = s.Databases["master"];
             return d.ExecuteWithResults(sql).Tables[0];
         }
+
+        /// <summary>
+        /// Get databases with compatibility level lower than instance
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>a datatable with the list of databases</returns>
+        public static DataTable DatabaseLowCompatibilityLevel(this smo.Server s)
+        {
+            int normalCompatibilityLevel = s.VersionMajor*10;
+            string sql = string.Format(@"SELECT name
+    , compatibility_level
+FROM sys.databases
+WHERE compatibility_level != {0}", normalCompatibilityLevel);
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
         #endregion
 
         #region SQL Server Versions
