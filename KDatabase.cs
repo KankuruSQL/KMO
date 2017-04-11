@@ -386,6 +386,7 @@ ORDER BY t.name").Tables[0];
 		, last_user_lookup 
 		, last_user_update 
 	FROM sys.dm_db_index_usage_stats (NOLOCK)
+    WHERE database_id = DB_ID()
 ) 
 SELECT MAX(last_read) AS last_read
 	, max (last_write) as last_write
@@ -424,6 +425,7 @@ SELECT s.name AS [Schema Name]
 FROM sys.tables t (NOLOCK)
 INNER JOIN sys.schemas s (NOLOCK) ON t.schema_id = s.schema_id
 LEFT JOIN #TEMP temp (NOLOCK) ON t.object_id = temp.object_id
+
 ORDER BY [Last Access] DESC
 
 DROP TABLE #TEMP").Tables[0];
