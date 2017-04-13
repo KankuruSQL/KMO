@@ -422,6 +422,8 @@ SELECT s.name AS [Schema Name]
 	, temp.last_read AS [Last Read]
 	, temp.last_write AS [Last Write]
 	, CASE WHEN COALESCE(temp.last_read, 0) > COALESCE(temp.last_write, 0) THEN temp.last_read ELSE temp.last_write END AS [Last Access]
+    , t.create_date AS [Create Date]
+    , t.modify_date AS [Last Modify Date]
 FROM sys.tables t (NOLOCK)
 INNER JOIN sys.schemas s (NOLOCK) ON t.schema_id = s.schema_id
 LEFT JOIN #TEMP temp (NOLOCK) ON t.object_id = temp.object_id
