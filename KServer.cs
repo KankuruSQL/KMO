@@ -84,6 +84,21 @@ WHERE compatibility_level != {0}", normalCompatibilityLevel);
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        /// <summary>
+        /// Get list of active trace flags
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>a datatable with the list of databases</returns>
+        public static DataTable GetActiveTraceFlags(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(@"CREATE TABLE #traceflag (traceflag int, status int, global int, session int)
+INSERT INTO #traceflag
+EXEC ('DBCC TRACESTATUS(-1)')
+SELECT * FROM #traceflag
+DROP TABLE #traceflag").Tables[0];
+        }
+
         #endregion
 
         #region SQL Server Versions
