@@ -313,7 +313,6 @@ GROUP BY qt.dbid
 	, qt.text";
             return d.ExecuteWithResults(_sql).Tables[0];
         }
-
         #endregion
 
         #region Backups
@@ -1022,6 +1021,41 @@ ORDER BY t.StartTime DESC";
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        #endregion
+
+        #region Dashboard
+        /// <summary>
+        /// Get list of databases which are not backup for a while
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <param name="checkSystemDb">True if you want to check system database backup</param>
+        /// <param name="fromDays">Last backup must be done before this number of day</param>
+        /// <param name="fromHours">Last backup must be done before this number of hour</param>
+        /// <param name="fromMinutes">Last backup must be done before this number of minute</param>
+        /// <returns></returns>
+        public static DataTable DashboardBackup(this smo.Server s, bool checkSystemDb = false, int fromDays = 1, int fromHours = 0, int fromMinutes = 0)
+        {
+            smo.Database d = s.Databases["master"];
+            string filterDb = " WHERE sdb.name NOT IN ('master', 'tempdb', 'model', 'msdb') ";
+            if (checkSystemDb)
+                filterDb = " WHERE sdb.name != 'tempdb' ";
+            string sql = string.Format(@"SELECT DatabaseName
+    , LastBackUpTime
+FROM
+(
+	SELECT TOP 30 sdb.name AS DatabaseName
+		, MAX(bus.backup_finish_date) AS LastBackUpTime
+	FROM sys.databases sdb (nolock)
+		LEFT OUTER JOIN msdb.dbo.backupset bus (nolock) ON bus.database_name = sdb.name AND bus.is_snapshot !=1
+    {0}
+    AND sdb.state != 6
+    GROUP BY sdb.name
+    ORDER BY LastBackUpTime, DatabaseName
+)a
+WHERE a.LastBackUpTime IS NULL
+	OR a.LastBackUpTime < dateadd(DAY, {1}, dateadd(HOUR, {2}, dateadd(MINUTE, {3}, GETDATE())))", filterDb, fromDays, fromHours, fromMinutes);
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
         #endregion
     }
 }
