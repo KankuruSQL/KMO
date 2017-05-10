@@ -1056,6 +1056,39 @@ WHERE a.LastBackUpTime IS NULL
 	OR a.LastBackUpTime < dateadd(DAY, {1}, dateadd(HOUR, {2}, dateadd(MINUTE, {3}, GETDATE())))", filterDb, fromDays, fromHours, fromMinutes);
             return d.ExecuteWithResults(sql).Tables[0];
         }
+
+        /// <summary>
+        /// Get files list with space
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>the result of the query</returns>
+        public static DataTable DashboardFiles(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"CREATE TABLE #TMPSPACEUSED
+(
+	dbname NVARCHAR(128),
+	filename NVARCHAR(128),
+	spaceused FLOAT
+)
+
+INSERT INTO #TMPSPACEUSED
+EXEC( 'sp_MSforeachdb''use [?]; SELECT ''''?'''' dbname, name AS filename,
+FILEPROPERTY(name,''''spaceused'''') spaceused FROM sysfiles''')
+
+SELECT CASE b.type WHEN 0 THEN 'DATA' ELSE b.type_desc END AS filetype
+	, b.name + ' (' + a.name + ')' AS logicalfile
+	, CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) AS filesize
+	, CAST((d.spaceused / 128.0) AS DECIMAL(15,2)) AS spaceused
+FROM sys.databases a
+	INNER JOIN sys.master_files b ON a.database_id = b.database_id
+	INNER JOIN #TMPSPACEUSED d  ON a.name = d.dbname AND b.name = d.filename
+WHERE a.name != 'model'
+
+DROP TABLE #TMPSPACEUSED";
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
         #endregion
     }
 }
