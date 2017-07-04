@@ -1089,6 +1089,78 @@ DROP TABLE #TMPSPACEUSED";
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        /// <summary>
+        /// Get disk space. If Ole Automation Procedure is enable, disk space in percent else disk space in MB
+        /// </summary>
+        /// <param name="s">Your smo server</param>
+        /// <returns>DataTable</returns>
+        public static DataTable DashboardDisk(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"DECLARE @t table(drive VARCHAR(2), totalsize BIGINT DEFAULT 0, freespace BIGINT)
+INSERT INTO @t(drive, freespace) EXEC xp_fixeddrives
+SELECT drive
+	, totalsize
+	, freespace
+FROM @t";
+            if (s.IsOleAutomationProcedureActivated())
+            {
+                sql = @"SET NOCOUNT ON
+DECLARE @hr INT
+DECLARE @fso INT
+DECLARE @drive CHAR(1)
+DECLARE @odrive INT
+DECLARE @TotalSize VARCHAR(20)
+DECLARE @MB Numeric
+SET @MB = 1048576
+CREATE TABLE #drives (drive CHAR(1) PRIMARY KEY, freespace INT NULL, TotalSize INT NULL)
+INSERT #drives(drive,freespace)
+EXEC master.dbo.xp_fixeddrives
+EXEC @hr=sp_OACreate 'Scripting.FileSystemObject',@fso OUT
+IF @hr <> 0
+	EXEC sp_OAGetErrorInfo @fso
+DECLARE dcur CURSOR LOCAL FAST_FORWARD
+FOR SELECT drive FROM #drives ORDER BY drive
+OPEN dcur FETCH NEXT FROM dcur INTO @drive
+WHILE @@FETCH_STATUS=0
+BEGIN
+EXEC @hr = sp_OAMethod @fso,'GetDrive', @odrive OUT, @drive
+IF @hr <> 0
+	EXEC sp_OAGetErrorInfo @fso
+EXEC @hr = sp_OAGetProperty @odrive,'TotalSize', @TotalSize OUT
+IF @hr <> 0
+	EXEC sp_OAGetErrorInfo @odrive
+UPDATE #drives
+SET totalsize=@TotalSize/@MB
+WHERE drive=@drive
+FETCH NEXT FROM dcur INTO @drive
+END
+CLOSE dcur
+DEALLOCATE dcur
+EXEC @hr=sp_OADestroy @fso
+IF @hr <> 0
+	EXEC sp_OAGetErrorInfo @fso
+SELECT drive
+	, totalsize, freespace
+FROM #drives
+ORDER BY drive
+DROP TABLE #drives";
+            }
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        public static bool IsOleAutomationProcedureActivated(this smo.Server s)
+        {
+            foreach (Microsoft.SqlServer.Management.Smo.ConfigProperty c in s.Configuration.Properties)
+            {
+                if (c.DisplayName == "Ole Automation Procedures" && c.RunValue == 1)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         #endregion
     }
 }
