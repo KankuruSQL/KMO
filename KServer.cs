@@ -1150,6 +1150,17 @@ DROP TABLE #drives";
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        /// <summary>
+        /// Just a simple query to test the connectivity
+        /// </summary>
+        /// <param name="s">your smo server object</param>
+        /// <returns>a datatable</returns>
+        public static DataTable DashboardIsAlive(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults("select 1").Tables[0];
+        }
+
         public static bool IsOleAutomationProcedureActivated(this smo.Server s)
         {
             foreach (Microsoft.SqlServer.Management.Smo.ConfigProperty c in s.Configuration.Properties)
