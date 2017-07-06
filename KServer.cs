@@ -914,26 +914,25 @@ ORDER BY {1} DESC", rowCount, orderQuery);
         public static DataTable GetTempDBFiles(this smo.Server s)
         {
             string sql = @"SELECT DB_NAME(fs.database_id) AS [Database Name]
-	, mf.name AS [Logical Name]
-    , mf.physical_name AS [Physical Name]
+	, df.name AS [Logical Name]
+    , df.physical_name AS [Physical Name]
 	, type_desc
-	, CAST(size AS BIGINT) * 1024 / 128 AS [Size]
+	, CAST(size AS BIGINT) / 128 AS [Size]
 	, CASE WHEN is_percent_growth = 1 THEN max_size ELSE CASE WHEN max_size = -1 THEN CAST(max_size AS BIGINT) ELSE CAST(max_size AS BIGINT) * 1024 / 128 END END AS [Max Size]
 	, CASE WHEN is_percent_growth = 1 THEN CAST(growth AS BIGINT) ELSE CAST(growth AS BIGINT) * 1024 / 128 END AS [Growth]
 	, is_percent_growth AS [Is Percent Growth]
-	, CASE WHEN num_of_reads = 0 THEN 0 
-		ELSE CAST(io_stall_read_ms/num_of_reads AS NUMERIC(10,1)) 
+	, CASE WHEN num_of_reads = 0 THEN 0
+		ELSE CAST(io_stall_read_ms/num_of_reads AS NUMERIC(10,1))
 		END AS [Avg Read latency ms]
-	, CASE WHEN num_of_writes = 0 THEN 0 
-		ELSE CAST(io_stall_write_ms/num_of_writes AS NUMERIC(10,1)) 
+	, CASE WHEN num_of_writes = 0 THEN 0
+		ELSE CAST(io_stall_write_ms/num_of_writes AS NUMERIC(10,1))
 		END AS [Avg Write latency ms]
-	, CASE WHEN (num_of_reads + num_of_writes) = 0 THEN 0 
-		ELSE CAST((io_stall_read_ms + io_stall_write_ms)/(num_of_reads + num_of_writes) AS NUMERIC(10,1)) 
+	, CASE WHEN (num_of_reads + num_of_writes) = 0 THEN 0
+		ELSE CAST((io_stall_read_ms + io_stall_write_ms)/(num_of_reads + num_of_writes) AS NUMERIC(10,1))
 		END AS [Avg IO latency ms]
-FROM sys.dm_io_virtual_file_stats(null,null) AS fs 
-	INNER JOIN sys.master_files AS mf (NOLOCK) ON fs.database_id = mf.database_id 
-		AND fs.[file_id] = mf.[file_id]
-WHERE DB_NAME(fs.database_id) = 'tempdb'";
+FROM sys.dm_io_virtual_file_stats(null,null) AS fs
+	INNER JOIN sys.database_files AS df (NOLOCK) ON fs.database_id = DB_ID()
+		AND fs.[file_id] = df.[file_id]";
             smo.Database d = s.Databases["tempdb"];
             return d.ExecuteWithResults(sql).Tables[0];
         }
