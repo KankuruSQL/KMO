@@ -1184,6 +1184,21 @@ ORDER BY qe.start_time", durationInMinute, filter.ToString());
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        /// <summary>
+        /// Get the actual Page Life Expectancy
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
+        public static DataTable DashboardPLE(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"SELECT[cntr_value] as PLE
+FROM sys.dm_os_performance_counters (NOLOCK)
+WHERE object_name LIKE '%Manager%'
+AND counter_name = 'Page life expectancy'";
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
 
         public static bool IsOleAutomationProcedureActivated(this smo.Server s)
         {
@@ -1196,7 +1211,6 @@ ORDER BY qe.start_time", durationInMinute, filter.ToString());
             }
             return false;
         }
-
         #endregion
     }
 }
