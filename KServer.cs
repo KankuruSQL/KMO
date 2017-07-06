@@ -1161,6 +1161,31 @@ DROP TABLE #drives";
             return d.ExecuteWithResults("select 1").Tables[0];
         }
 
+        public static DataTable DashboardGetLocks(this smo.Server s, int durationInMinute, List<string> queriesToIgnore)
+        {
+            StringBuilder filter = new StringBuilder();
+            foreach (string query in queriesToIgnore)
+            {
+                filter.AppendLine(" AND st.text NOT LIKE '" + query + "'");
+            }
+
+            smo.Database d = s.Databases["master"];
+            string sql = string.Format(@"SELECT TOP 20 qe.session_id
+	, qe.blocking_session_id
+	, qe.start_time
+	, CASE WHEN LEN(st.text) < 100 THEN st.text ELSE SUBSTRING(st.text, 0, 100) + ' (...)' END AS query
+FROM sys.dm_exec_requests qe (nolock)
+	INNER JOIN sys.dm_exec_sessions s (nolock) ON qe.session_id = s.session_id
+	CROSS APPLY sys.dm_exec_sql_text(qe.sql_handle) st
+WHERE (DATEDIFF(SECOND, qe.start_time, GETDATE())) / {0} > 0
+	AND s.is_user_process = 1
+    AND st.text NOT LIKE 'sp_server_diagnostics%'
+    {1}
+ORDER BY qe.start_time", durationInMinute, filter.ToString());
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+
         public static bool IsOleAutomationProcedureActivated(this smo.Server s)
         {
             foreach (Microsoft.SqlServer.Management.Smo.ConfigProperty c in s.Configuration.Properties)
