@@ -1189,13 +1189,52 @@ ORDER BY qe.start_time", durationInMinute, filter.ToString());
         /// </summary>
         /// <param name="s"></param>
         /// <returns></returns>
-        public static DataTable DashboardPLE(this smo.Server s)
+        public static DataTable DashboardPle(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
             string sql = @"SELECT[cntr_value] as PLE
 FROM sys.dm_os_performance_counters (NOLOCK)
 WHERE object_name LIKE '%Manager%'
 AND counter_name = 'Page life expectancy'";
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        /// <summary>
+        /// Get the sql and system cpu average of the last 30 minutes
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
+        public static DataTable DashboardCpu(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            const string sql = @"DECLARE @ts_now bigint
+SELECT @ts_now = cpu_ticks / (cpu_ticks / ms_ticks)
+FROM sys.dm_os_sys_info
+;WITH ring AS
+(
+    SELECT
+       record.value('(Record/@id)[1]', 'int') AS record_id,
+       DATEADD (ms, -1 * (@ts_now - [timestamp]), GETDATE()) AS EventTime,
+       100 - record.value('(Record/SchedulerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS system_cpu_utilization_post_sp2,
+       record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS sql_cpu_utilization_post_sp2 ,
+       100 - record.value('(Record/SchedluerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS system_cpu_utilization_pre_sp2,
+       record.value('(Record/SchedluerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS sql_cpu_utilization_pre_sp2
+     FROM (
+       SELECT TOP 30 timestamp, CONVERT (xml, record) AS record
+       FROM sys.dm_os_ring_buffers
+       WHERE ring_buffer_type = 'RING_BUFFER_SCHEDULER_MONITOR'
+         AND record LIKE '%<SystemHealth>%'
+	   ORDER BY timestamp DESC) AS t
+), cte AS
+(
+    SELECT EventTime
+        , CASE WHEN system_cpu_utilization_post_sp2 IS NOT NULL THEN system_cpu_utilization_post_sp2 ELSE system_cpu_utilization_pre_sp2 END AS system_cpu
+        , CASE WHEN sql_cpu_utilization_post_sp2 IS NOT NULL THEN sql_cpu_utilization_post_sp2 ELSE sql_cpu_utilization_pre_sp2 END AS sql_cpu
+    FROM ring
+)
+SELECT AVG(system_cpu) AS system_cpu
+    , AVG(CASE WHEN sql_cpu > system_cpu THEN sql_cpu / 2 ELSE sql_cpu END) AS cpu
+FROM cte";
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
