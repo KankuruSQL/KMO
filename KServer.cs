@@ -1239,6 +1239,30 @@ FROM cte";
         }
 
 
+        public static DataTable DashboardJob(this smo.Server s, DateTime logDay, List<string> errorToIgnore)
+        {
+            StringBuilder sqlErrorToIgnore = new StringBuilder();
+            foreach (string sqlError in errorToIgnore)
+            {
+                sqlErrorToIgnore.Append(" AND h.message NOT LIKE '" + sqlError + "'");
+            }
+
+            smo.Database d = s.Databases["msdb"];
+            string sql = string.Format(@"SELECT j.name
+    , h.message
+    , h.run_date
+    , h.run_time
+FROM msdb.dbo.sysjobs j (NOLOCK)
+    INNER JOIN msdb.dbo.sysjobhistory h (NOLOCK) ON h.job_id = j.job_id
+WHERE run_date = {0}
+    AND run_status = 0
+{1}
+ORDER BY run_date desc
+    , run_time desc", logDay.ToString("yyyyMMdd"), sqlErrorToIgnore.ToString());
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+
         public static bool IsOleAutomationProcedureActivated(this smo.Server s)
         {
             foreach (Microsoft.SqlServer.Management.Smo.ConfigProperty c in s.Configuration.Properties)
