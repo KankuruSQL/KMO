@@ -691,5 +691,55 @@ ORDER BY reserved DESC", minSize, maxSize, objectTypeFilter);
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+
+        public static DataTable DashboardSsrs(this smo.Database d, TimeSpan logFrom)
+        {
+            string sql = string.Format(@"SELECT EL.TimeStart AS LogDate
+, EL.Status + '"" on ""' +     CASE(ReportAction)
+        WHEN 1 THEN 'Render'
+        WHEN 2 THEN 'BookmarkNavigation'
+        WHEN 3 THEN 'DocumentMapNavigation'
+        WHEN 4 THEN 'DrillThrough'
+        WHEN 5 THEN 'FindString'
+        WHEN 6 THEN 'GetDocumentMap'
+        WHEN 7 THEN 'Toggle'
+        WHEN 8 THEN 'Sort'
+        WHEN 9 THEN 'Execute'
+        WHEN 10 THEN 'RenderEdit'
+        ELSE 'Unknown'
+        END + '"" the report ""' + ISNULL(C.Name, EL.ReportID) + '"". The username is ""' + EL.UserName + '""' AS texte
+FROM ExecutionLogStorage EL (NOLOCK)
+	LEFT JOIN Catalog C (NOLOCK) ON EL.ReportID = C.ItemID
+WHERE EL.Status != 'rsSuccess'
+	AND EL.TimeStart >= DATEADD(DAY, -{0}, DATEADD(HOUR, -{1}, DATEADD(MINUTE, -{2}, GETDATE())))
+UNION ALL
+SELECT LastRunTime AS LogDate
+   , 'Subscription ' + coalesce(c.Name, '') + ' : ' + LastStatus AS texte
+FROM Subscriptions s
+    LEFT JOIN Catalog c ON s.Report_OID = c.ItemID
+WHERE s.LastStatus LIKE 'Failure%'
+    AND LastRunTime >= DATEADD(DAY, -{0}, DATEADD(HOUR, -{1}, DATEADD(MINUTE, -{2}, GETDATE())))
+ORDER BY LogDate DESC", logFrom.Days, logFrom.Hours, logFrom.Minutes);
+            if (d.Parent.VersionMajor < 10)
+            {
+                sql = string.Format(@"SELECT EL.TimeStart AS LogDate
+    , EL.Status + '"" on the report ""' + ISNULL(C.Name, EL.ReportID) + '"". The username is ""' + EL.UserName + '""' AS texte
+FROM ExecutionLog EL (NOLOCK)
+	LEFT JOIN Catalog C (NOLOCK) ON EL.ReportID = C.ItemID
+WHERE EL.Status != 'rsSuccess'
+	AND EL.TimeStart >= DATEADD(DAY, -{0}, DATEADD(HOUR, -{1}, DATEADD(MINUTE, -{2}, GETDATE())))
+UNION ALL
+SELECT LastRunTime AS LogDate
+   , 'Subscription ' + coalesce(c.Name, '') + ' : ' + LastStatus AS texte
+FROM Subscriptions s
+    LEFT JOIN Catalog c ON s.Report_OID = c.ItemID
+WHERE s.LastStatus like 'Failure%'
+    AND LastRunTime >= DATEADD(DAY, -{0}, DATEADD(HOUR, -{1}, DATEADD(MINUTE, -{2}, GETDATE())))
+ORDER BY LogDate DESC", logFrom.Days, logFrom.Hours, logFrom.Minutes);
+            }
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+
     }
 }
