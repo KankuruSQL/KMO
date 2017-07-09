@@ -1262,6 +1262,104 @@ ORDER BY run_date desc
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        public static DataTable DashboardErrorLog(this smo.Server s, TimeSpan logFrom, bool withReplicationLog, bool withInformationMessage, bool withDatabaseMail, List<string> errorToIgnore)
+        {
+            string sql = string.Format(@"
+DECLARE @sqlStatement VARCHAR(1000);
+SET @sqlStatement = 'master.dbo.xp_readerrorlog'
+DECLARE @REPLICATION TABLE (LogDate DATETIME,ProcessInfo NVARCHAR(50),vchMessage NVARCHAR(2000))
+DECLARE @Errors TABLE (LogDate DATETIME,ProcessInfo NVARCHAR(50),vchMessage NVARCHAR(2000))
+INSERT @Errors(LogDate, ProcessInfo, vchMessage) EXEC @sqlStatement
+
+DELETE FROM @Errors
+WHERE LogDate < DATEADD(SECOND, -{0}, DATEADD(MINUTE, -{1}, DATEADD(HH, -{2}, DATEADD(DAY, -{3}, GETDATE()))))
+",
+                logFrom.Seconds, logFrom.Minutes, logFrom.Hours, logFrom.Days);
+
+            StringBuilder sqlErrorToIgnore = new StringBuilder();
+            foreach (string sqlError in errorToIgnore)
+            {
+                sqlErrorToIgnore.AppendLine(string.Format(" delete FROM @Errors where vchMessage like '{0}' ", sqlError));
+            }
+            sql += sqlErrorToIgnore.ToString();
+
+            if (withReplicationLog)
+            {
+                sql += string.Format(@"
+DECLARE @DatabaseName NVARCHAR(128)
+DECLARE @SQLScript VARCHAR(8000)
+
+DECLARE DatabaseCursor CURSOR FOR
+	SELECT name
+	FROM sys.databases
+	WHERE is_distributor = 1
+OPEN DatabaseCursor
+FETCH NEXT FROM DatabaseCursor INTO @DatabaseName
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	SET @SQLScript = 'USE [' + @DatabaseName + '];
+		IF EXISTS(SELECT * FROM sys.objects WHERE name = ''MSrepl_errors'')
+		BEGIN
+			SELECT [time] AS LogDate
+				, ''''
+				, DB_NAME() + '' '' + source_name + '' : '' + CAST(error_text AS NVARCHAR(4000)) AS texte
+			FROM dbo.MSrepl_errors WITH (READUNCOMMITTED)
+			WHERE [time] >= dateadd(SECOND, -{0}, dateadd(MINUTE, -{1}, dateadd(HH, -{2}, dateadd(DAY, -{3}, GETDATE()))))
+            ORDER BY time DESC
+		END'
+	INSERT INTO @REPLICATION (LogDate, ProcessInfo, vchMessage)
+	EXEC (@SQLScript)
+	FETCH NEXT FROM DatabaseCursor INTO @DatabaseName
+END
+CLOSE DatabaseCursor
+DEALLOCATE DatabaseCursor
+", logFrom.Seconds, logFrom.Minutes, logFrom.Hours, logFrom.Days);
+            }
+
+            sql += @"
+SELECT LogDate AS LogDate
+    , RTRIM(LTRIM(vchMessage)) AS texte
+    , ProcessInfo
+FROM @Errors";
+
+            if (!withInformationMessage)
+            {
+                sql += @" WHERE vchMessage NOT LIKE '%This is an informational message%'
+AND vchMessage NOT LIKE '%Ce message est fourni à titre d''information. Aucune action n''est requise de la part de l''utilisateur.%'
+AND vchMessage NOT LIKE '%DBCC CHECKDB%found 0 errors and repaired 0 errors%'
+AND vchMessage NOT LIKE '%No user action is required%'
+AND vchMessage NOT LIKE '%No user action required%' ";
+            }
+
+            if (withDatabaseMail)
+            {
+                sql += string.Format(@"
+UNION ALL
+SELECT log_date AS LogDate
+    , '[DBMAIL] ' + description AS texte
+    , ''
+FROM msdb.dbo.sysmail_log
+WHERE event_type != 1
+    AND log_date >= dateadd(SECOND, -{0}, dateadd(MINUTE, -{1}, dateadd(HH, -{2}, dateadd(DAY, -{3}, GETDATE()))))",
+                    logFrom.Seconds, logFrom.Minutes, logFrom.Hours, logFrom.Days);
+            }
+
+            if (withReplicationLog)
+            {
+                sql += @"
+UNION ALL
+SELECT LogDate AS LogDate
+    , '[REPLICATION] ' + vchMessage AS texte
+    , ProcessInfo
+FROM @REPLICATION";
+            }
+
+            sql += @"
+ORDER BY LogDate DESC";
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
 
         public static bool IsOleAutomationProcedureActivated(this smo.Server s)
         {
