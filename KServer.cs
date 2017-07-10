@@ -114,7 +114,7 @@ DROP TABLE #traceflag").Tables[0];
             switch (s.VersionMajor.ToString() + "." + s.VersionMinor.ToString())
             {
                 case "14.0":
-                    version = "Sql Server VNext";
+                    version = "Sql Server 2017";
                     break;
                 case "13.0":
                     version = "Sql Server 2016";
