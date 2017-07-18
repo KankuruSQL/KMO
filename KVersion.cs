@@ -2,8 +2,8 @@
 {
     public static class KVersion
     {
-        public const int Sp2017 = 600;
-        public const int Cu2017 = 600;
+        public const int Sp2017 = 800;
+        public const int Cu2017 = 800;
         public const int Sp2016 = 4001;
         public const int Cu2016 = 4435;
         public const int Sp2014 = 5000;
