@@ -1360,6 +1360,217 @@ ORDER BY LogDate DESC";
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        /// <summary>
+        /// Get the statistics used in Dashboard Instance
+        /// Statistics of the last 1 second
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
+        public static DataTable DashboardInstance(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            const string sql = @"DECLARE @BATCHREQUESTPERSECOND BIGINT
+DECLARE @COMPILATIONPERSECOND BIGINT
+DECLARE @RECOMPILATIONPERSECOND BIGINT
+DECLARE @LOCKWAITPERSECOND BIGINT
+DECLARE @PAGESPLITPERSECOND BIGINT
+DECLARE @CHECKPOINTPAGEPERSECOND BIGINT
+DECLARE @DATEPOINT DATETIME
+
+DECLARE @STATSBEFORE TABLE ([object_name] VARCHAR (128)
+	, [counter_name] VARCHAR (128)
+	, [instance_name] VARCHAR (128)
+	, [cntr_value] BIGINT
+	, [cntr_type] INT)
+
+DECLARE @STATSAFTER TABLE ([object_name] VARCHAR (128)
+	, [counter_name] VARCHAR (128)
+	, [instance_name] VARCHAR (128)
+	, [cntr_value] BIGINT
+	, [cntr_type] INT)
+
+SET @DATEPOINT = GETDATE()
+
+INSERT INTO @STATSBEFORE ([object_name]
+			, [counter_name]
+			, [instance_name]
+			, [cntr_value]
+			, [cntr_type])
+SELECT [object_name]
+	, [counter_name]
+	, [instance_name]
+	, [cntr_value]
+	, [cntr_type]
+FROM sys.dm_os_performance_counters
+WHERE (counter_name = 'Buffer cache hit ratio'
+			AND object_name LIKE '%Buffer Manager%')
+	OR (counter_name = 'Buffer cache hit ratio base'
+			AND object_name LIKE '%Buffer Banager%')
+	OR (counter_name = 'Page life expectancy '
+			AND object_name LIKE '%Buffer Manager%')
+	OR (counter_name = 'Batch Requests/sec'
+			AND object_name LIKE '%SQL Statistics%')
+	OR (counter_name = 'SQL Compilations/sec'
+			AND object_name LIKE '%SQL Statistics%')
+	OR (counter_name = 'SQL Re-Compilations/sec'
+			AND object_name LIKE '%SQL Statistics%')
+	OR (counter_name = 'User Connections'
+			AND object_name LIKE '%General Statistics%')
+	OR (counter_name = 'Lock Waits/sec'
+			AND instance_name = '_Total'
+			AND object_name LIKE '%Locks%')
+	OR (counter_name = 'Page Splits/sec'
+			AND object_name LIKE '%Access Methods%')
+	OR (counter_name = 'Processes blocked'
+			AND object_name LIKE '%General Statistics%')
+	OR (counter_name = 'Checkpoint pages/sec'
+			AND object_name LIKE '%Buffer Manager%')
+
+SELECT TOP 1 @BATCHREQUESTPERSECOND = cntr_value
+FROM @STATSBEFORE
+WHERE counter_name = 'Batch Requests/sec'
+	AND object_name LIKE '%SQL Statistics%'
+
+SELECT TOP 1 @COMPILATIONPERSECOND = cntr_value
+FROM @STATSBEFORE
+WHERE counter_name = 'SQL Compilations/sec'
+	AND object_name LIKE '%SQL Statistics%'
+
+SELECT TOP 1 @RECOMPILATIONPERSECOND = cntr_value
+FROM @STATSBEFORE
+WHERE counter_name = 'SQL Re-Compilations/sec'
+	AND object_name LIKE '%SQL Statistics%'
+
+SELECT TOP 1 @LOCKWAITPERSECOND = cntr_value
+FROM @STATSBEFORE
+WHERE counter_name = 'Lock Waits/sec'
+	AND instance_name = '_Total'
+	AND object_name LIKE '%Locks%'
+
+SELECT TOP 1 @PAGESPLITPERSECOND = cntr_value
+FROM @STATSBEFORE
+WHERE counter_name = 'Page Splits/sec'
+	AND object_name LIKE '%Access Methods%'
+
+SELECT TOP 1 @CHECKPOINTPAGEPERSECOND = cntr_value
+FROM @STATSBEFORE
+WHERE counter_name = 'Checkpoint pages/sec'
+	AND object_name LIKE '%Buffer Manager%'
+
+WAITFOR DELAY '00:00:01'
+
+INSERT INTO @STATSAFTER ([object_name]
+	, [counter_name]
+	, [instance_name]
+	, [cntr_value]
+	, [cntr_type])
+
+SELECT [object_name]
+	, [counter_name]
+	, [instance_name]
+	, [cntr_value]
+	, [cntr_type]
+FROM sys.dm_os_performance_counters
+WHERE (counter_name = 'Buffer cache hit ratio'
+			AND object_name LIKE '%Buffer Manager%')
+	OR (counter_name = 'Buffer cache hit ratio base'
+			AND object_name LIKE '%Buffer Manager%')
+	OR (counter_name = 'Page life expectancy '
+			AND object_name LIKE '%Buffer Manager%')
+	OR (counter_name = 'Batch Requests/sec'
+			AND object_name LIKE '%SQL Statistics%')
+	OR (counter_name = 'SQL Compilations/sec'
+			AND object_name LIKE '%SQL Statistics%')
+	OR (counter_name = 'SQL Re-Compilations/sec'
+			AND object_name LIKE '%SQL Statistics%')
+	OR (counter_name = 'User Connections'
+			AND object_name LIKE '%General Statistics%')
+	OR (counter_name = 'Lock Waits/sec'
+			AND instance_name = '_Total'
+			AND object_name LIKE '%Locks%')
+	OR (counter_name = 'Page Splits/sec'
+			AND object_name LIKE '%Access Methods%')
+	OR (counter_name = 'Processes blocked'
+			AND object_name LIKE '%General Statistics%')
+	OR (counter_name = 'Checkpoint pages/sec'
+			AND object_name LIKE '%Buffer Manager%')
+
+SELECT FLOOR(ROUND(a.cntr_value * 1.0 / b.cntr_value * 100, 0)) [buffercachehitratio]
+	, c.cntr_value AS [pagelifeexpectency]
+	, d.[batchrequestspersecond]
+	, e.[compilationspersecond]
+	, f.[recompilationspersecond]
+	, g.cntr_value AS [userconnections]
+	, h.lockwaitspersecond
+	, i.pagesplitspersecond
+	, j.cntr_value AS [processesblocked]
+	, k.checkpointpagespersecond
+	, GETDATE() AS statdate
+FROM (
+		SELECT *
+		FROM @STATSAFTER
+		WHERE counter_name = 'Buffer cache hit ratio'
+			AND object_name LIKE '%Buffer Manager%') a
+	CROSS JOIN (
+		SELECT *
+		FROM @STATSAFTER
+		WHERE counter_name = 'Buffer cache hit ratio base'
+			AND object_name LIKE '%Buffer Manager%') b
+	CROSS JOIN (
+		SELECT *
+		FROM @STATSAFTER
+		WHERE counter_name = 'Page life expectancy '
+			AND object_name LIKE '%Buffer Manager%') c
+	CROSS JOIN (
+		SELECT (cntr_value - @BATCHREQUESTPERSECOND) / (CASE WHEN DATEDIFF (ss , @DATEPOINT , GETDATE()) = 0 THEN 1
+				ELSE DATEDIFF (ss , @DATEPOINT , GETDATE()) END) AS [batchrequestspersecond]
+		FROM @STATSAFTER
+		WHERE counter_name = 'Batch Requests/sec'
+			AND object_name LIKE '%SQL Statistics%') d
+	CROSS JOIN (
+		SELECT (cntr_value - @COMPILATIONPERSECOND) / (CASE WHEN DATEDIFF (ss , @DATEPOINT , GETDATE()) = 0 THEN 1
+				ELSE DATEDIFF (ss , @DATEPOINT , GETDATE()) END) AS [compilationspersecond]
+		FROM @STATSAFTER
+		WHERE counter_name = 'SQL Compilations/sec'
+			AND object_name LIKE '%SQL Statistics%') e
+	CROSS JOIN (
+		SELECT (cntr_value - @RECOMPILATIONPERSECOND) / (CASE WHEN DATEDIFF (ss , @DATEPOINT , GETDATE()) = 0 THEN 1
+				ELSE DATEDIFF (ss , @DATEPOINT , GETDATE()) END) AS [recompilationspersecond]
+		FROM @STATSAFTER
+		WHERE counter_name = 'SQL Re-Compilations/sec'
+			AND object_name LIKE '%SQL Statistics%') f
+	CROSS JOIN (
+		SELECT *
+		FROM @STATSAFTER
+		WHERE counter_name = 'User Connections'
+			AND object_name LIKE '%General Statistics%') g
+	CROSS JOIN (
+		SELECT (cntr_value - @LOCKWAITPERSECOND) / (CASE WHEN DATEDIFF (ss , @DATEPOINT , GETDATE()) = 0 THEN 1
+				ELSE DATEDIFF (ss , @DATEPOINT , GETDATE()) END) AS [lockwaitspersecond]
+		FROM @STATSAFTER
+		WHERE counter_name = 'Lock Waits/sec'
+			AND instance_name = '_Total'
+			AND object_name LIKE '%Locks%') h
+	CROSS JOIN (
+		SELECT (cntr_value - @PAGESPLITPERSECOND) / (CASE WHEN DATEDIFF (ss , @DATEPOINT , GETDATE()) = 0 THEN 1
+				ELSE DATEDIFF (ss , @DATEPOINT , GETDATE()) END) AS [pagesplitspersecond]
+		FROM @STATSAFTER
+		WHERE counter_name = 'Page Splits/sec'
+			AND object_name LIKE '%Access Methods%') i
+	CROSS JOIN (
+		SELECT *
+		FROM @STATSAFTER
+		WHERE counter_name = 'Processes blocked'
+			AND object_name LIKE '%General Statistics%') j
+	CROSS JOIN (
+		SELECT (cntr_value - @CHECKPOINTPAGEPERSECOND) / (CASE WHEN DATEDIFF (ss , @DATEPOINT , GETDATE()) = 0 THEN 1
+				ELSE DATEDIFF (ss , @DATEPOINT , GETDATE()) END) AS [checkpointpagespersecond]
+		FROM @STATSAFTER
+		WHERE counter_name = 'Checkpoint pages/sec'
+			AND object_name LIKE '%Buffer Manager%') k";
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
 
         public static bool IsOleAutomationProcedureActivated(this smo.Server s)
         {
