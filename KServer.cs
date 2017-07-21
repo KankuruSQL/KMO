@@ -748,6 +748,32 @@ GROUP BY [W1].[RowNum]
 HAVING SUM ([W2].[Percentage]) - MAX ([W1].[Percentage]) < 99;", sqlIgnore);
             return d.ExecuteWithResults(sql).Tables[0];
         }
+
+        /// <summary>
+        /// Get Wait statistics for an instance. Used in Live Wait Profiler
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <param name="listWaitToIgnore">Optionnal List of wait stats to ignore with simple quote and separated by coma. Example : 'WaitStatToIgnore1', 'WaitStatToIgnore2' </param>
+        /// <returns>return the result of the query in a DataTable</returns>
+        public static DataTable GetLiveWaitProfiler(this smo.Server s, string listWaitToIgnore = "'BROKER_EVENTHANDLER', 'BROKER_RECEIVE_WAITFOR', 'BROKER_TASK_STOP', 'BROKER_TO_FLUSH', 'BROKER_TRANSMITTER', 'CHECKPOINT_QUEUE', 'CHKPT', 'CLR_AUTO_EVENT', 'CLR_MANUAL_EVENT', 'CLR_SEMAPHORE', 'DBMIRROR_DBM_EVENT', 'DBMIRROR_EVENTS_QUEUE', 'DBMIRROR_WORKER_QUEUE', 'DBMIRRORING_CMD', 'DIRTY_PAGE_POLL', 'DISPATCHER_QUEUE_SEMAPHORE', 'EXECSYNC', 'FSAGENT', 'FT_IFTS_SCHEDULER_IDLE_WAIT', 'FT_IFTSHC_MUTEX', 'HADR_CLUSAPI_CALL', 'HADR_FILESTREAM_IOMGR_IOCOMPLETION', 'HADR_LOGCAPTURE_WAIT', 'HADR_NOTIFICATION_DEQUEUE', 'HADR_TIMER_TASK', 'HADR_WORK_QUEUE', 'KSOURCE_WAKEUP', 'LAZYWRITER_SLEEP', 'LOGMGR_QUEUE', 'ONDEMAND_TASK_QUEUE', 'PWAIT_ALL_COMPONENTS_INITIALIZED', 'QDS_PERSIST_TASK_MAIN_LOOP_SLEEP', 'QDS_CLEANUP_STALE_QUERIES_TASK_MAIN_LOOP_SLEEP', 'REQUEST_FOR_DEADLOCK_SEARCH', 'RESOURCE_QUEUE', 'SERVER_IDLE_CHECK', 'SLEEP_BPOOL_FLUSH', 'SLEEP_DBSTARTUP', 'SLEEP_DCOMSTARTUP', 'SLEEP_MASTERDBREADY', 'SLEEP_MASTERMDREADY', 'SLEEP_MASTERUPGRADED', 'SLEEP_MSDBSTARTUP', 'SLEEP_SYSTEMTASK', 'SLEEP_TASK', 'SLEEP_TEMPDBSTARTUP', 'SNI_HTTP_ACCEPT', 'SP_SERVER_DIAGNOSTICS_SLEEP', 'SQLTRACE_BUFFER_FLUSH', 'SQLTRACE_INCREMENTAL_FLUSH_SLEEP', 'SQLTRACE_WAIT_ENTRIES', 'WAIT_FOR_RESULTS', 'WAITFOR', 'WAITFOR_TASKSHUTDOWN', 'WAIT_XTP_HOST_WAIT', 'WAIT_XTP_OFFLINE_CKPT_NEW_LOG', 'WAIT_XTP_CKPT_CLOSE', 'XE_DISPATCHER_JOIN', 'XE_DISPATCHER_WAIT', 'XE_TIMER_EVENT'")
+        {
+            string sqlIgnore = string.Empty;
+            if (!string.IsNullOrEmpty(listWaitToIgnore))
+            {
+                sqlIgnore = "AND [wait_type] NOT IN (" + listWaitToIgnore + ")";
+            }
+            smo.Database d = s.Databases["master"];
+            string sql = string.Format(@"SELECT wait_type
+	, CAST(wait_time_ms / 1000.0 AS DECIMAL (16,2)) AS [Wait]
+	, CAST((wait_time_ms - signal_wait_time_ms) / 1000.0 AS DECIMAL (16,2)) AS [Resource]
+	, CAST(signal_wait_time_ms / 1000.0 AS DECIMAL (16,2)) AS [Signal]
+	, waiting_tasks_count AS [Count]
+FROM sys.dm_os_wait_stats
+WHERE waiting_tasks_count > 0
+{0}
+ORDER BY wait_type", sqlIgnore);
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
         #endregion
 
         #region ErrorLogs
