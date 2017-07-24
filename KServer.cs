@@ -768,11 +768,21 @@ HAVING SUM ([W2].[Percentage]) - MAX ([W1].[Percentage]) < 99;", sqlIgnore);
 	, CAST((wait_time_ms - signal_wait_time_ms) / 1000.0 AS DECIMAL (16,2)) AS [Resource]
 	, CAST(signal_wait_time_ms / 1000.0 AS DECIMAL (16,2)) AS [Signal]
 	, waiting_tasks_count AS [Count]
+    , CASE WHEN CHARINDEX('_', wait_type, 0) != 0 THEN SUBSTRING(wait_type,0, CHARINDEX('_', wait_type, 0)) ELSE wait_type END AS [Category]
 FROM sys.dm_os_wait_stats
 WHERE waiting_tasks_count > 0
 {0}
 ORDER BY wait_type", sqlIgnore);
-            return d.ExecuteWithResults(sql).Tables[0];
+            DataTable dt = d.ExecuteWithResults(sql).Tables[0];
+            dt.Columns.Add(new DataColumn("Description"));
+            foreach (DataRow dr in dt.Rows)
+            {
+                string waitType = dr["wait_type"].ToString();
+                dr["Description"] = (from l in Resources.WaitTypes.GetWaitsDictionary()
+                                       where l.Key == waitType
+                                       select l.Value).SingleOrDefault();
+            }
+            return dt;
         }
         #endregion
 
