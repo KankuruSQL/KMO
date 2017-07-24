@@ -727,13 +727,15 @@ OPTION (RECOMPILE)";
 		[signal_wait_time_ms] / 1000.0 AS [SignalS],
 		[waiting_tasks_count] AS [WaitCount],
 		100.0 * [wait_time_ms] / SUM ([wait_time_ms]) OVER() AS [Percentage],
-		ROW_NUMBER() OVER(ORDER BY [wait_time_ms] DESC) AS [RowNum]
+		ROW_NUMBER() OVER(ORDER BY [wait_time_ms] DESC) AS [RowNum],
+        CASE WHEN CHARINDEX('_', wait_type, 0) != 0 THEN SUBSTRING(wait_type,0, CHARINDEX('_', wait_type, 0)) ELSE wait_type END AS [Category]
 	FROM sys.dm_os_wait_stats
 	WHERE [waiting_tasks_count] > 0
 		{0}
 )
 SELECT
 	MAX ([W1].[wait_type]) AS [wait_type],
+	MAX ([W1].[Category]) AS [Category],
 	CAST (MAX ([W1].[WaitS]) AS DECIMAL (16,2)) AS [wait_time_s],
 	CAST (MAX ([W1].[ResourceS]) AS DECIMAL (16,2)) AS [Resource_S],
 	CAST (MAX ([W1].[SignalS]) AS DECIMAL (16,2)) AS [Signal_S],
@@ -746,7 +748,16 @@ FROM [Waits] AS [W1]
 	INNER JOIN [Waits] AS [W2] ON [W2].[RowNum] <= [W1].[RowNum]
 GROUP BY [W1].[RowNum]
 HAVING SUM ([W2].[Percentage]) - MAX ([W1].[Percentage]) < 99;", sqlIgnore);
-            return d.ExecuteWithResults(sql).Tables[0];
+            DataTable dt = d.ExecuteWithResults(sql).Tables[0];
+            dt.Columns.Add(new DataColumn("Description"));
+            foreach (DataRow dr in dt.Rows)
+            {
+                string waitType = dr["wait_type"].ToString();
+                dr["Description"] = (from l in Resources.WaitTypes.GetWaitsDictionary()
+                                     where l.Key == waitType
+                                     select l.Value).SingleOrDefault();
+            }
+            return dt;
         }
 
         /// <summary>
