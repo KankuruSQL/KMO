@@ -1631,5 +1631,34 @@ FROM (
             return false;
         }
         #endregion
+
+        #region Latches
+        /// <summary>
+        /// Get latch statistics for an instance. Used in Live Latches Profiler
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>return the result of the query in a DataTable</returns>
+        public static DataTable GetLiveLatchesProfiler(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            const string sql = @"SELECT latch_class AS [Latch]
+	, CASE WHEN CHARINDEX('_', latch_class, 0) != 0 THEN SUBSTRING(latch_class,0, CHARINDEX('_', latch_class, 0)) ELSE latch_class END AS [Category]
+	, wait_time_ms AS [Time]
+	, waiting_requests_count AS [Count]
+	, max_wait_time_ms AS [MaxTime]
+FROM sys.dm_os_latch_stats";
+            DataTable dt = d.ExecuteWithResults(sql).Tables[0];
+            dt.Columns.Add(new DataColumn("Description"));
+            foreach (DataRow dr in dt.Rows)
+            {
+                string latch = dr["Latch"].ToString();
+                dr["Description"] = (from l in Resources.Latches.GetLatchesDictionary()
+                                     where l.Key == latch
+                                     select l.Value).SingleOrDefault();
+            }
+            return dt;
+        }
+        #endregion
+
     }
 }
