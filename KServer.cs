@@ -439,21 +439,21 @@ ORDER BY ec.client_net_address
 )
 
 DECLARE @path NVARCHAR(1000)
-SELECT @path = SUBSTRING(PATH, 1, LEN(PATH) - CHARINDEX('\', REVERSE(PATH))) + '\log.trc'
+SELECT @path = SUBSTRING(path, 1, LEN(path) - CHARINDEX('\', REVERSE(path))) + '\log.trc'
 FROM sys.traces
 WHERE id = 1;
 
 WITH CTE (databaseid, filename, EndTime)
 AS
 (
-	SELECT databaseid
-		, filename
+	SELECT DatabaseID
+		, FileName
 		, MAX(t.EndTime) AS EndTime
 	FROM ::fn_trace_gettable(@path, default ) t
 	WHERE EventClass IN (92, 93)
 		AND DATEDIFF(hh,StartTime,GETDATE()) < 24
-	GROUP BY databaseid
-		, filename
+	GROUP BY DatabaseID
+		, FileName
 )
 INSERT INTO #TMPLASTFILECHANGE
 (
@@ -489,21 +489,21 @@ EXEC('sp_MSforeachdb''use [?]; Select ''''?'''' AS DBName
 
 SELECT a.name AS DatabaseName
 	, b.name AS FileName
-	, CASE b.TYPE WHEN 0 THEN 'DATA' ELSE b.type_desc END AS FileType
+	, CASE b.type WHEN 0 THEN 'DATA' ELSE b.type_desc END AS FileType
 	, CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) AS FileSize
 	, CAST((b.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) / CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) * 100 AS FreeSpace
 	, b.physical_name
 	, datediff(DAY, c.endtime, GETDATE()) AS LastGrowth
 FROM sys.databases a
 	INNER JOIN sys.master_files b ON a.database_id = b.database_id
-	INNER JOIN #TMPSPACEUSED d  ON a.NAME = d.DBNAME 
+	INNER JOIN #TMPSPACEUSED d  ON a.name = d.DBNAME 
 		AND b.name = d.FILENAME
 	LEFT JOIN #TMPLASTFILECHANGE c on a.name = c.databasename 
 		AND b.name = c.filename
 WHERE b.size >= ({0} / 8.0 * 1024.0)
 	AND b.size <= ({1} / 8.0 * 1024.0)
     {2}
-ORDER BY FILESIZE DESC
+ORDER BY FileSize DESC
 
 DROP TABLE #TMPSPACEUSED
 DROP TABLE #TMPLASTFILECHANGE
