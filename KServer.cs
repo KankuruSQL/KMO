@@ -879,9 +879,9 @@ SELECT LogDate
 FROM #KMOLoginFailed
 WHERE (SUBSTRING(vchMessage,1, 12) = 'Login failed'
 	OR vchMessage LIKE '%SSPI%'
-    OR processinfo = 'Logon')
-	AND logdate > '{1}'
-	AND logdate < '{2}'
+    OR ProcessInfo = 'Logon')
+	AND LogDate > '{1}'
+	AND LogDate < '{2}'
 ORDER BY LogDate DESC
 
 DROP TABLE #KMOLoginFailed", logFileNumber, startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"));
