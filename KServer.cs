@@ -1809,6 +1809,7 @@ FROM sys.availability_groups g
         AND r.group_id = rs.group_id
 	INNER JOIN dist ON r.group_id = dist.distributedGroupId
 WHERE role = 2
+    AND EXISTS (SELECT * FROM sys.availability_groups g2 WHERE g2.name = gs.primary_replica)
 ORDER BY sort
     , role
 	, availability_mode desc
