@@ -178,6 +178,7 @@ DROP TABLE #traceflag").Tables[0];
 	, s.client_interface_name AS [Client_Interface_Name]
 	, db_name(qe.Database_id) AS [Database]
 	, qe.logical_reads AS [Logical_Read]
+    , qe.writes AS [Writes]
 	, qe.cpu_time AS [CPU_Time]
 	, DATEDIFF(MINUTE, start_time, getdate()) AS [Duration]
 	, command AS [Command]
