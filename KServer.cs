@@ -1660,5 +1660,199 @@ FROM sys.dm_os_latch_stats";
         }
         #endregion
 
+        #region Dashboard Availability Groups
+
+        public static DataTable DashboardAG_GetAvailabilityGroups(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"SELECT group_id as groupId
+	, name as groupName
+FROM sys.availability_groups
+ORDER BY groupName";
+            if (s.VersionMajor >= 13)
+            {
+                sql = @"SELECT group_id AS groupId
+	, name AS groupName
+FROM sys.availability_groups
+WHERE is_distributed = 0
+ORDER BY groupName";
+            }
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        public static DataTable DashboardAG_GetDatabases(this smo.Server s, string groupId)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = String.Format(@"SELECT database_name AS dbName
+FROM sys.availability_databases_cluster
+WHERE group_id = '{0}'
+ORDER BY dbName", groupId);
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        public static DataTable DashboardAG_GetReplica(this smo.Server s, string groupId)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"SELECT r.replica_server_name AS hostName
+    , s.role AS isPrimary
+FROM sys.availability_replicas r
+    INNER JOIN sys.dm_hadr_availability_replica_states s ON r.group_id = s.group_id
+        AND r.replica_id = s.replica_id
+WHERE r.group_id = '{0}'
+ORDER BY hostName";
+
+            if (s.VersionMajor >= 13)
+            {
+                sql = @"WITH dist AS
+(
+    SELECT g.group_id AS distributedGroupId
+        , g.name
+        , d.group_id AS localGroupId
+    FROM sys.availability_groups g
+        INNER JOIN sys.availability_replicas r ON g.group_id = r.group_id
+        CROSS APPLY sys.fn_hadr_distributed_ag_replica(g.group_id, r.replica_id) d
+    WHERE is_distributed = 1
+        AND d.group_id = '{0}'
+)
+SELECT r.replica_server_name AS hostName
+    , s.role as isPrimary
+    , r.group_id
+FROM sys.availability_replicas r
+    INNER JOIN sys.dm_hadr_availability_replica_states s ON r.group_id = s.group_id
+        AND r.replica_id = s.replica_id
+WHERE r.group_id = '{0}'
+UNION ALL
+SELECT r.replica_server_name as hostName
+    , s.role as isPrimary
+    , r.group_id
+FROM sys.availability_replicas r
+    INNER JOIN dist ON r.group_id = dist.distributedGroupId
+    INNER JOIN sys.dm_hadr_availability_replica_states s ON r.group_id = s.group_id
+        AND r.replica_id = s.replica_id
+WHERE role = 2
+ORDER BY hostName";
+            }
+            return d.ExecuteWithResults(string.Format(sql, groupId)).Tables[0];
+        }
+
+
+        public static DataTable DashboardAG_GetReplicasInfo(this smo.Server s, string groupId)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"SELECT g.name
+    , rs.role
+    , gs.synchronization_health_desc AS groupstate
+    , r.replica_id
+    , r.replica_server_name
+    , r.availability_mode
+    , rs.operational_state
+    , rs.operational_state_desc
+    , rs.synchronization_health
+    , rs.synchronization_health_desc
+FROM sys.availability_groups g
+    INNER JOIN sys.dm_hadr_availability_group_states gs ON g.group_id = gs.group_id
+    INNER JOIN sys.availability_replicas r ON g.group_id = r.group_id
+    INNER JOIN sys.dm_hadr_availability_replica_states rs ON r.replica_id = rs.replica_id
+        AND r.group_id = rs.group_id
+WHERE g.group_id = '{0}'
+ORDER BY role
+    , availability_mode desc
+    , r.replica_server_name";
+
+            if (s.VersionMajor >= 13)
+            {
+                sql = @"WITH dist AS
+(
+	SELECT g.group_id AS distributedGroupId
+		, g.name
+		, d.group_id AS localGroupId
+	FROM sys.availability_groups g
+	    INNER JOIN sys.availability_replicas r on g.group_id = r.group_id
+	    CROSS APPLY sys.fn_hadr_distributed_ag_replica(g.group_id, r.replica_id) d
+	WHERE is_distributed = 1
+	    AND d.group_id = '{0}'
+)
+SELECT g.name
+	, rs.role
+	, gs.synchronization_health_desc as groupstate
+	, r.replica_id
+	, r.replica_server_name
+	, r.availability_mode
+	, rs.operational_state
+	, rs.operational_state_desc
+	, rs.synchronization_health
+	, rs.synchronization_health_desc
+    , 1 AS sort
+FROM sys.availability_groups g
+	INNER JOIN sys.dm_hadr_availability_group_states gs on g.group_id = gs.group_id
+	INNER JOIN sys.availability_replicas r on g.group_id = r.group_id
+	INNER JOIN sys.dm_hadr_availability_replica_states rs ON r.replica_id = rs.replica_id
+        AND r.group_id = rs.group_id
+WHERE g.group_id = '{0}'
+UNION ALL
+SELECT g.name
+	, rs.role
+	, gs.synchronization_health_desc as groupstate
+	, r.replica_id
+	, r.replica_server_name
+	, 2
+	, rs.operational_state
+	, rs.operational_state_desc
+	, rs.synchronization_health
+	, rs.synchronization_health_desc
+    , 2 AS sort
+FROM sys.availability_groups g
+	INNER JOIN sys.dm_hadr_availability_group_states gs ON g.group_id = gs.group_id
+	INNER JOIN sys.availability_replicas r ON g.group_id = r.group_id
+	INNER JOIN sys.dm_hadr_availability_replica_states rs ON r.replica_id = rs.replica_id
+        AND r.group_id = rs.group_id
+	INNER JOIN dist ON r.group_id = dist.distributedGroupId
+WHERE role = 2
+ORDER BY sort
+    , role
+	, availability_mode desc
+    , r.replica_server_name";
+            }
+            return d.ExecuteWithResults(string.Format(sql, groupId)).Tables[0];
+        }
+
+        public static DataTable DashboardAG_GetDatabasesInfo(this smo.Server s, string groupId)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"SELECT d.group_database_id
+	, r.replica_server_name
+	, d.database_name
+	, drs.database_state_desc
+	, drs.synchronization_state_desc
+	, r.availability_mode
+    , drs.log_send_queue_size
+    , drs.log_send_rate
+    , drs.redo_queue_size
+    , drs.redo_rate
+FROM sys.availability_databases_cluster d
+	INNER JOIN sys.dm_hadr_database_replica_states drs ON d.group_id = drs.group_id
+        AND d.group_database_id = drs.group_database_id
+	INNER JOIN sys.availability_replicas r ON drs.replica_id = r.replica_id
+        AND drs.group_id = r.group_id
+	INNER JOIN sys.dm_hadr_availability_replica_states rs ON r.replica_id = rs.replica_id
+        AND r.group_id = rs.group_id
+WHERE d.group_id = '{0}'
+ORDER BY d.database_name
+	, rs.role
+	, availability_mode desc
+    , r.replica_server_name";
+            return d.ExecuteWithResults(string.Format(sql, groupId)).Tables[0];
+        }
+
+        public static DataTable DashboardAG_GetPrimary(this smo.Server s, string groupId)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"SELECT primary_replica
+FROM sys.dm_hadr_availability_group_states
+WHERE group_id = '{0}'";
+            return d.ExecuteWithResults(string.Format(sql, groupId)).Tables[0];
+        }
+
+        #endregion
     }
 }
