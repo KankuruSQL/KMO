@@ -1663,6 +1663,11 @@ FROM sys.dm_os_latch_stats";
 
         #region Dashboard Availability Groups
 
+        /// <summary>
+        /// Get availability groups without distributed groups
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>a DataTable</returns>
         public static DataTable DashboardAG_GetAvailabilityGroups(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
@@ -1681,6 +1686,12 @@ ORDER BY groupName";
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        /// <summary>
+        /// Get database list for a given availability group
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <param name="groupId">availability group id. UniqueIdentifier</param>
+        /// <returns>a DataTable</returns>
         public static DataTable DashboardAG_GetDatabases(this smo.Server s, string groupId)
         {
             smo.Database d = s.Databases["master"];
@@ -1691,6 +1702,12 @@ ORDER BY dbName", groupId);
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        /// <summary>
+        /// Get the replica list and its role for an availability group
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <param name="groupId">availability group id. UniqueIdentifier</param>
+        /// <returns>a DataTable</returns>
         public static DataTable DashboardAG_GetReplica(this smo.Server s, string groupId)
         {
             smo.Database d = s.Databases["master"];
@@ -1736,7 +1753,12 @@ ORDER BY hostName";
             return d.ExecuteWithResults(string.Format(sql, groupId)).Tables[0];
         }
 
-
+        /// <summary>
+        /// Get the health state for each replica of an availability group
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <param name="groupId">availability group id. UniqueIdentifier</param>
+        /// <returns>a DataTable</returns>
         public static DataTable DashboardAG_GetReplicasInfo(this smo.Server s, string groupId)
         {
             smo.Database d = s.Databases["master"];
@@ -1818,6 +1840,12 @@ ORDER BY sort
             return d.ExecuteWithResults(string.Format(sql, groupId)).Tables[0];
         }
 
+        /// <summary>
+        /// Get health status of each replica by database
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <param name="groupId">availability group id. UniqueIdentifier</param>
+        /// <returns>a DataTable</returns>
         public static DataTable DashboardAG_GetDatabasesInfo(this smo.Server s, string groupId)
         {
             smo.Database d = s.Databases["master"];
@@ -1846,6 +1874,12 @@ ORDER BY d.database_name
             return d.ExecuteWithResults(string.Format(sql, groupId)).Tables[0];
         }
 
+        /// <summary>
+        /// Get the primary replica name for a given availability group
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <param name="groupId">availability group id. UniqueIdentifier</param>
+        /// <returns>a DataTable</returns>
         public static DataTable DashboardAG_GetPrimary(this smo.Server s, string groupId)
         {
             smo.Database d = s.Databases["master"];
