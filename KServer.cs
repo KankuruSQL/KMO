@@ -1423,6 +1423,10 @@ DECLARE @RECOMPILATIONPERSECOND BIGINT
 DECLARE @LOCKWAITPERSECOND BIGINT
 DECLARE @PAGESPLITPERSECOND BIGINT
 DECLARE @CHECKPOINTPAGEPERSECOND BIGINT
+DECLARE @LAZYWRITEPERSECOND BIGINT
+DECLARE @TRANSACTIONPERSECOND BIGINT
+DECLARE @IOSTALLREADPERSECOND BIGINT
+DECLARE @IOSTALLWRITEPERSECOND BIGINT
 DECLARE @DATEPOINT DATETIME
 
 DECLARE @STATSBEFORE TABLE ([object_name] VARCHAR (128)
@@ -1473,6 +1477,10 @@ WHERE (counter_name = 'Buffer cache hit ratio'
 			AND object_name LIKE '%General Statistics%')
 	OR (counter_name = 'Checkpoint pages/sec'
 			AND object_name LIKE '%Buffer Manager%')
+	OR (counter_name LIKE 'Lazy writes/sec%'
+			AND object_name LIKE '%Buffer Manager%')
+	OR (counter_name LIKE 'Transactions/sec%'
+			AND instance_name LIKE '_Total%')
 
 SELECT TOP 1 @BATCHREQUESTPERSECOND = cntr_value
 FROM @STATSBEFORE
@@ -1504,6 +1512,21 @@ SELECT TOP 1 @CHECKPOINTPAGEPERSECOND = cntr_value
 FROM @STATSBEFORE
 WHERE counter_name = 'Checkpoint pages/sec'
 	AND object_name LIKE '%Buffer Manager%'
+
+SELECT TOP 1 @LAZYWRITEPERSECOND = cntr_value
+FROM @STATSBEFORE
+WHERE counter_name LIKE 'Lazy writes/sec%'
+	AND object_name LIKE '%Buffer Manager%'
+
+SELECT TOP 1 @TRANSACTIONPERSECOND = cntr_value
+FROM @STATSBEFORE
+WHERE counter_name LIKE 'Transactions/sec%'
+	AND instance_name LIKE '_Total%'
+
+SELECT @IOSTALLREADPERSECOND = SUM(io_stall_read_ms)
+	, @IOSTALLWRITEPERSECOND = SUM(io_stall_write_ms)
+FROM sys.dm_io_virtual_file_stats(NULL, NULL)
+
 
 WAITFOR DELAY '00:00:01'
 
@@ -1542,6 +1565,10 @@ WHERE (counter_name = 'Buffer cache hit ratio'
 			AND object_name LIKE '%General Statistics%')
 	OR (counter_name = 'Checkpoint pages/sec'
 			AND object_name LIKE '%Buffer Manager%')
+	OR (counter_name LIKE 'Lazy writes/sec%'
+			AND object_name LIKE '%Buffer Manager%')
+	OR (counter_name LIKE 'Transactions/sec%'
+			AND instance_name LIKE '_Total%')
 
 SELECT FLOOR(ROUND(a.cntr_value * 1.0 / b.cntr_value * 100, 0)) [buffercachehitratio]
 	, c.cntr_value AS [pagelifeexpectency]
@@ -1553,6 +1580,10 @@ SELECT FLOOR(ROUND(a.cntr_value * 1.0 / b.cntr_value * 100, 0)) [buffercachehitr
 	, i.pagesplitspersecond
 	, j.cntr_value AS [processesblocked]
 	, k.checkpointpagespersecond
+	, l.lazywriterpersecond
+	, m.transactionpersecond
+	, n.iostallreadpersecond
+	, n.iostallwritepersecond
 	, GETDATE() AS statdate
 FROM (
 		SELECT *
@@ -1615,7 +1646,23 @@ FROM (
 				ELSE DATEDIFF (ss , @DATEPOINT , GETDATE()) END) AS [checkpointpagespersecond]
 		FROM @STATSAFTER
 		WHERE counter_name = 'Checkpoint pages/sec'
-			AND object_name LIKE '%Buffer Manager%') k";
+			AND object_name LIKE '%Buffer Manager%') k
+	CROSS JOIN (
+		SELECT (cntr_value - @LAZYWRITEPERSECOND) / (CASE WHEN DATEDIFF (ss , @DATEPOINT , GETDATE()) = 0 THEN 1
+				ELSE DATEDIFF (ss , @DATEPOINT , GETDATE()) END) AS [lazywriterpersecond]
+		FROM @STATSAFTER
+		WHERE counter_name LIKE 'Lazy writes/sec%'
+			AND object_name LIKE '%Buffer Manager%') l
+	CROSS JOIN (
+		SELECT (cntr_value - @TRANSACTIONPERSECOND) / (CASE WHEN DATEDIFF (ss , @DATEPOINT , GETDATE()) = 0 THEN 1
+				ELSE DATEDIFF (ss , @DATEPOINT , GETDATE()) END) AS [transactionpersecond]
+		FROM @STATSAFTER
+		WHERE counter_name LIKE 'Transactions/sec%'
+			AND instance_name LIKE '_Total%') m
+	CROSS JOIN (
+		SELECT SUM(io_stall_read_ms) - @IOSTALLREADPERSECOND AS [iostallreadpersecond]
+			, SUM(io_stall_write_ms) - @IOSTALLWRITEPERSECOND AS [iostallwritepersecond]
+		FROM sys.dm_io_virtual_file_stats(null, null)) n";
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
