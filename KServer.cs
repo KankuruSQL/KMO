@@ -1240,10 +1240,18 @@ ORDER BY qe.start_time", durationInMinute, filter.ToString());
         public static DataTable DashboardPle(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
-            string sql = @"SELECT[cntr_value] as PLE
-FROM sys.dm_os_performance_counters (NOLOCK)
+            string sql = @"CREATE TABLE #MSVER(ID INT, Name SYSNAME, Internal_Value INT, Value NVARCHAR(512))
+INSERT INTO #MSVER EXEC master.dbo.xp_msver
+SELECT opc.cntr_value as PLE
+	, CASE WHEN c.value_in_use < t.Internal_Value THEN c.value_in_use ELSE t.Internal_Value END AS value_in_use
+FROM sys.dm_os_performance_counters opc (NOLOCK)
+    CROSS APPLY sys.configurations c
+    CROSS APPLY #MSVER t
 WHERE object_name LIKE '%Manager%'
-AND counter_name = 'Page life expectancy'";
+	AND counter_name = 'Page life expectancy'
+	AND c.name LIKE 'max server memory%'
+	AND t.Name = N'PhysicalMemory'
+DROP TABLE #MSVER";
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
