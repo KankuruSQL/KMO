@@ -433,6 +433,23 @@ ORDER BY [Last Access] DESC
 DROP TABLE #TEMP").Tables[0];
         }
 
+        public static DataTable GetLastExecutionByProcedure(this smo.Database d)
+        {
+            return d.ExecuteWithResults(@"SELECT sc.name AS [Schema]
+	, p.name AS [Procedure Name]
+	, SUM(execution_count) AS [Execution Count]
+	, MAX (last_execution_time) AS [Last Execution Time]
+FROM sys.procedures p
+	INNER JOIN sys.schemas sc ON p.schema_id = sc.schema_id
+	LEFT JOIN sys.dm_exec_procedure_stats s ON sc.name = OBJECT_SCHEMA_NAME(s.object_id, database_id)
+		AND p.name = OBJECT_NAME(s.object_id, database_id)
+		AND s.database_id = DB_ID()
+GROUP BY sc.name
+	, p.name
+ORDER BY sc.name
+	, p.name").Tables[0];
+        }
+
         /// <summary>
         /// Find all columns in a database with the same name but with different datatype
         /// </summary>
