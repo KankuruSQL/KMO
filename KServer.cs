@@ -942,6 +942,8 @@ ORDER BY {1} DESC", rowCount, orderQuery);
 	, total_logical_reads/execution_count AS [Average Logical Reads]
 	, total_logical_writes/execution_count AS [Average Logical Writes]
 	, total_elapsed_time/execution_count/1000 AS [Average Elapsed Time]
+	, qs.last_execution_time AS [Last Execution]
+	, qs.creation_time AS [Creation Date]
 	, qt.text AS [Parent Query]
 FROM sys.dm_exec_query_stats AS qs
 	CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) AS qt
