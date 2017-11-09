@@ -934,7 +934,7 @@ ORDER BY {1} DESC", rowCount, orderQuery);
         /// <returns></returns>
         public static DataTable GetTop50Queries(this smo.Server s, string orderQuery = "Execution Count", int rowCount = 50)
         {
-            string sql = string.Format(@"SELECT TOP ({0}) CASE WHEN qt.dbid = 32767 THEN 'Resource' ELSE DB_NAME(qt.dbid) END AS [Database]
+            string sql = string.Format(@"SELECT TOP ({0}) CASE WHEN qp.dbid = 32767 THEN 'Resource' ELSE DB_NAME(qp.dbid) END AS [Database]
 	, SUBSTRING(qt.text, qs.statement_start_offset / 2 + 1, (CASE WHEN qs.statement_end_offset = -1 THEN LEN(CONVERT(NVARCHAR(MAX), qt.text)) * 2  ELSE qs.statement_end_offset END - qs.statement_start_offset)/2) AS Query
 	, execution_count AS [Execution Count]
 	, total_worker_time/execution_count/1000 AS [Average Worker Time]
@@ -945,6 +945,7 @@ ORDER BY {1} DESC", rowCount, orderQuery);
 	, qt.text AS [Parent Query]
 FROM sys.dm_exec_query_stats AS qs
 	CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) AS qt
+	CROSS APPLY sys.dm_exec_query_plan(qs.plan_handle) AS qp
 ORDER BY {1} DESC", rowCount, orderQuery);
 
             smo.Database d = s.Databases["master"];
