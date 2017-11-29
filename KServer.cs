@@ -315,6 +315,31 @@ GROUP BY qt.dbid
 	, qt.text";
             return d.ExecuteWithResults(_sql).Tables[0];
         }
+
+        /// <summary>
+        /// Get IO statistics.
+        /// Useful to calculate diff statistics like in Live IO Profiler in Kankuru
+        /// </summary>
+        /// <param name="s">SMO server</param>
+        /// <returns>a DataTable</returns>
+        public static DataTable GetLiveIOProfiler(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string _sql = @"SELECT DB_NAME(fs.database_id) AS [DbName]
+	, mf.physical_name AS [FileName]
+	, io_stall_read_ms AS [IOStallReadMs]
+	, num_of_reads AS [ReadCount]
+	, io_stall_write_ms AS [IOStallWriteMs]
+	, num_of_writes AS [WriteCount]
+	, io_stall_read_ms + io_stall_write_ms AS [IOStallMs]
+	, num_of_reads + num_of_writes AS [IOCount]
+FROM sys.dm_io_virtual_file_stats(NULL,NULL) AS fs
+	INNER JOIN sys.master_files AS mf (NOLOCK) ON fs.database_id = mf.database_id
+		AND fs.[file_id] = mf.[file_id]
+ORDER BY [IOCount] DESC
+OPTION (RECOMPILE)";
+            return d.ExecuteWithResults(_sql).Tables[0];
+        }
         #endregion
 
         #region Backups
