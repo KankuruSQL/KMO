@@ -757,6 +757,117 @@ ORDER BY LogDate DESC", logFrom.Days, logFrom.Hours, logFrom.Minutes);
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        #region Statistics
+        /// <summary>
+        /// Get the statistics options for the database
+        /// </summary>
+        public static DataTable StatisticsConfiguration(this smo.Database d)
+        {
+            string sql = @"DECLARE @SQL NVARCHAR(4000)
+SET @SQL = 'SELECT {0} AS is_auto_update_stats_on
+    , {1} AS is_auto_update_stats_async_on
+    , {2} AS is_auto_create_stats_on
+    , {3} AS is_auto_create_stats_incremental_on
+FROM sys.databases
+WHERE database_id = DB_ID()'
 
+IF EXISTS(SELECT *
+FROM sys.all_columns c
+WHERE c.name = 'is_auto_update_stats_on'
+
+    AND OBJECT_NAME(c.object_id) = 'databases')
+BEGIN
+    SET @SQL = REPLACE(@SQL, '{0}', 'is_auto_update_stats_on')
+END
+ELSE
+BEGIN
+    SET @SQL = REPLACE(@SQL, '{0}', '''N/A''')
+END
+
+IF EXISTS(SELECT *
+FROM sys.all_columns c
+WHERE c.name = 'is_auto_update_stats_async_on'
+
+    AND OBJECT_NAME(c.object_id) = 'databases')
+BEGIN
+    SET @SQL = REPLACE(@SQL, '{1}', 'is_auto_update_stats_async_on')
+END
+ELSE
+BEGIN
+    SET @SQL = REPLACE(@SQL, '{1}', '''N/A''')
+END
+
+IF EXISTS(SELECT *
+FROM sys.all_columns c
+WHERE c.name = 'is_auto_create_stats_on'
+
+    AND OBJECT_NAME(c.object_id) = 'databases')
+BEGIN
+    SET @SQL = REPLACE(@SQL, '{2}', 'is_auto_create_stats_on')
+END
+ELSE
+BEGIN
+    SET @SQL = REPLACE(@SQL, '{2}', '''N/A''')
+END
+
+IF EXISTS(SELECT *
+FROM sys.all_columns c
+WHERE c.name = 'is_auto_create_stats_incremental_on'
+
+    AND OBJECT_NAME(c.object_id) = 'databases')
+BEGIN
+    SET @SQL = REPLACE(@SQL, '{3}', 'is_auto_create_stats_incremental_on')
+END
+ELSE
+BEGIN
+    SET @SQL = REPLACE(@SQL, '{3}', '''N/A''')
+END
+
+EXECUTE sys.sp_executesql @SQL";
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        /// <summary>
+        /// Get informations for each statistics in the database
+        /// </summary>
+        public static DataTable StatisticsProperties(this smo.Database d)
+        {
+            string sql = @"SELECT sch.name + '.' + o.name AS [Table]
+	, s.name AS StatName
+	, STUFF((
+			SELECT
+				', ' + COL_NAME(sic.object_id, sic.column_id) AS [Name]
+			FROM sys.stats st
+				INNER JOIN sys.stats_columns sic ON sic.stats_id=st.stats_id
+					AND sic.object_id=st.object_id
+			WHERE st.stats_id = s.stats_id
+				AND st.object_id = s.object_id
+			FOR XML PATH(''), TYPE
+		).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS [Columns]
+	, sp.last_updated AS [Last Updated]
+	, sp.rows AS [Rows]
+	, sp.rows_sampled AS [Rows Sampled]
+	, sp.modification_counter AS [Modification Counter]
+	, sp.unfiltered_rows AS [Unfiltered Rows]
+	, sp.steps AS [Steps]
+	, s.auto_created AS [Auto Created]
+	, s.user_created AS [User Created]
+	, s.has_filter AS [Has Filter]
+	, s.is_incremental AS [Is Incremental]
+	, s.is_temporary AS [Is Temporary]
+	, s.no_recompute AS [No Recompute]
+FROM sys.stats s
+	CROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) sp
+	INNER JOIN sys.objects o ON s.object_id = o.object_id
+	INNER JOIN sys.schemas sch ON o.schema_id = sch.schema_id
+WHERE OBJECTPROPERTY(o.object_id, 'IsUserTable') = 1
+ORDER BY modification_counter DESC
+    , [Table]
+    , StatName
+";
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        #endregion
     }
 }
