@@ -829,41 +829,90 @@ EXECUTE sys.sp_executesql @SQL";
 
         /// <summary>
         /// Get informations for each statistics in the database
+        /// Inspired by https://littlekendra.com/2016/12/06/when-did-sql-server-last-update-that-statistic-how-much-has-been-modified-since-and-what-columns-are-in-the-stat/
         /// </summary>
         public static DataTable StatisticsProperties(this smo.Database d)
         {
-            string sql = @"SELECT sch.name + '.' + o.name AS [Table]
-	, s.name AS StatName
-	, STUFF((
-			SELECT
-				', ' + COL_NAME(sic.object_id, sic.column_id) AS [Name]
-			FROM sys.stats st
-				INNER JOIN sys.stats_columns sic ON sic.stats_id=st.stats_id
-					AND sic.object_id=st.object_id
-			WHERE st.stats_id = s.stats_id
-				AND st.object_id = s.object_id
-			FOR XML PATH(''), TYPE
-		).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS [Columns]
-	, sp.last_updated AS [Last Updated]
-	, sp.rows AS [Rows]
-	, sp.rows_sampled AS [Rows Sampled]
-	, sp.modification_counter AS [Modification Counter]
-	, sp.unfiltered_rows AS [Unfiltered Rows]
-	, sp.steps AS [Steps]
-	, s.auto_created AS [Auto Created]
-	, s.user_created AS [User Created]
-	, s.has_filter AS [Has Filter]
-	, s.is_incremental AS [Is Incremental]
-	, s.is_temporary AS [Is Temporary]
-	, s.no_recompute AS [No Recompute]
-FROM sys.stats s
-	CROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) sp
-	INNER JOIN sys.objects o ON s.object_id = o.object_id
-	INNER JOIN sys.schemas sch ON o.schema_id = sch.schema_id
-WHERE OBJECTPROPERTY(o.object_id, 'IsUserTable') = 1
-ORDER BY modification_counter DESC
-    , [Table]
-    , StatName
+            string sql = @"IF EXISTS (SELECT * FROM sys.all_objects WHERE name = 'dm_db_stats_properties')
+BEGIN
+    SELECT sch.name + '.' + o.name AS [Table]
+	    , s.name AS StatName
+	    , STUFF((
+			    SELECT
+				    ', ' + COL_NAME(sic.object_id, sic.column_id) AS [Name]
+			    FROM sys.stats st
+				    INNER JOIN sys.stats_columns sic ON sic.stats_id=st.stats_id
+					    AND sic.object_id=st.object_id
+			    WHERE st.stats_id = s.stats_id
+				    AND st.object_id = s.object_id
+			    FOR XML PATH(''), TYPE
+		    ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS [Columns]
+	    , sp.last_updated AS [Last Updated]
+	    , sp.rows AS [Rows]
+	    , sp.rows_sampled AS [Rows Sampled]
+	    , sp.modification_counter AS [Modification Counter]
+	    , sp.unfiltered_rows AS [Unfiltered Rows]
+	    , sp.steps AS [Steps]
+	    , s.auto_created AS [Auto Created]
+	    , s.user_created AS [User Created]
+	    , s.has_filter AS [Has Filter]
+	    , s.is_incremental AS [Is Incremental]
+	    , s.is_temporary AS [Is Temporary]
+	    , s.no_recompute AS [No Recompute]
+    FROM sys.stats s
+	    CROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) sp
+	    INNER JOIN sys.objects o ON s.object_id = o.object_id
+	    INNER JOIN sys.schemas sch ON o.schema_id = sch.schema_id
+    WHERE OBJECTPROPERTY(o.object_id, 'IsUserTable') = 1
+    ORDER BY modification_counter DESC
+        , [Table]
+        , StatName
+END
+ELSE
+BEGIN
+    WITH cteIndexStats AS
+    (
+	    SELECT id
+		    , ind.name
+		    , rowmodctr
+        FROM sys.sysindexes AS sysind
+		    INNER JOIN sys.indexes AS ind ON sysind.id = ind.object_id
+                AND sysind.indid=ind.index_id
+    ),
+    cteColumnStats AS
+    (
+	    SELECT id
+		    , rowmodctr
+        FROM sys.sysindexes as sysind
+        WHERE sysind.indid in (0,1)
+    )
+    SELECT OBJECT_NAME(o.object_id) AS [Table]
+        , s.name AS StatName
+	    , STUFF((
+		    SELECT
+			    ', ' + COL_NAME(sic.object_id, sic.column_id) AS [Name]
+		    FROM sys.stats st
+			    INNER JOIN sys.stats_columns sic ON sic.stats_id=st.stats_id
+				    AND sic.object_id=st.object_id
+		    WHERE st.stats_id = s.stats_id
+			    AND st.object_id = s.object_id
+		    FOR XML PATH(''), TYPE
+		    ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS [Columns]
+	    , STATS_DATE(s.object_id, s.stats_id) AS [Last Updated]
+	    , ISNULL(i.rowmodctr, c.rowmodctr) AS [Estimated Modification Counter]
+        , s.auto_created AS [Auto Created]
+        , s.is_temporary AS [Is Temporary]
+        , s.no_recompute AS [No Recompute]
+    FROM sys.stats s
+	    INNER JOIN sys.objects o ON s.object_id=o.object_id
+	    INNER JOIN sys.schemas sc ON o.schema_id=sc.schema_id
+	    LEFT JOIN cteIndexStats i ON i.id = o.object_id
+	    LEFT JOIN cteColumnStats c ON c.id = o.object_id
+    WHERE OBJECTPROPERTY(o.object_id, 'IsUserTable') = 1
+    ORDER BY [Estimated Modification Counter] DESC
+	    , [Table]
+	    , [StatName]
+END
 ";
             return d.ExecuteWithResults(sql).Tables[0];
         }
