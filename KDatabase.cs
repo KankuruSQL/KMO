@@ -831,89 +831,156 @@ EXECUTE sys.sp_executesql @SQL";
         /// Get informations for each statistics in the database
         /// Inspired by https://littlekendra.com/2016/12/06/when-did-sql-server-last-update-that-statistic-how-much-has-been-modified-since-and-what-columns-are-in-the-stat/
         /// </summary>
-        public static DataTable StatisticsProperties(this smo.Database d)
+        public static DataTable StatisticsProperties(this smo.Database d, bool? autoCreated, bool? linkedToIndex)
         {
-            string sql = @"IF EXISTS (SELECT * FROM sys.all_objects WHERE name = 'dm_db_stats_properties')
-BEGIN
-    SELECT sch.name + '.' + o.name AS [Table]
-	    , s.name AS StatName
-	    , STUFF((
-			    SELECT
-				    ', ' + COL_NAME(sic.object_id, sic.column_id) AS [Name]
-			    FROM sys.stats st
-				    INNER JOIN sys.stats_columns sic ON sic.stats_id=st.stats_id
-					    AND sic.object_id=st.object_id
-			    WHERE st.stats_id = s.stats_id
-				    AND st.object_id = s.object_id
-			    FOR XML PATH(''), TYPE
-		    ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS [Columns]
-	    , sp.last_updated AS [Last Updated]
-	    , sp.rows AS [Rows]
-	    , sp.rows_sampled AS [Rows Sampled]
-	    , sp.modification_counter AS [Modification Counter]
-	    , sp.unfiltered_rows AS [Unfiltered Rows]
-	    , sp.steps AS [Steps]
-	    , s.auto_created AS [Auto Created]
-	    , s.user_created AS [User Created]
-	    , s.has_filter AS [Has Filter]
-	    , s.is_incremental AS [Is Incremental]
-	    , s.is_temporary AS [Is Temporary]
-	    , s.no_recompute AS [No Recompute]
-    FROM sys.stats s
-	    CROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) sp
-	    INNER JOIN sys.objects o ON s.object_id = o.object_id
-	    INNER JOIN sys.schemas sch ON o.schema_id = sch.schema_id
-    WHERE OBJECTPROPERTY(o.object_id, 'IsUserTable') = 1
-    ORDER BY modification_counter DESC
-        , [Table]
-        , StatName
-END
-ELSE
-BEGIN
-    WITH cteIndexStats AS
-    (
-	    SELECT id
-		    , ind.name
-		    , rowmodctr
-        FROM sys.sysindexes AS sysind
-		    INNER JOIN sys.indexes AS ind ON sysind.id = ind.object_id
-                AND sysind.indid=ind.index_id
-    ),
-    cteColumnStats AS
-    (
-	    SELECT id
-		    , rowmodctr
-        FROM sys.sysindexes as sysind
-        WHERE sysind.indid in (0,1)
-    )
-    SELECT OBJECT_NAME(o.object_id) AS [Table]
-        , s.name AS StatName
-	    , STUFF((
-		    SELECT
-			    ', ' + COL_NAME(sic.object_id, sic.column_id) AS [Name]
-		    FROM sys.stats st
-			    INNER JOIN sys.stats_columns sic ON sic.stats_id=st.stats_id
-				    AND sic.object_id=st.object_id
-		    WHERE st.stats_id = s.stats_id
-			    AND st.object_id = s.object_id
-		    FOR XML PATH(''), TYPE
-		    ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS [Columns]
-	    , STATS_DATE(s.object_id, s.stats_id) AS [Last Updated]
-	    , ISNULL(i.rowmodctr, c.rowmodctr) AS [Estimated Modification Counter]
-        , s.auto_created AS [Auto Created]
-        , s.is_temporary AS [Is Temporary]
-        , s.no_recompute AS [No Recompute]
-    FROM sys.stats s
-	    INNER JOIN sys.objects o ON s.object_id=o.object_id
-	    INNER JOIN sys.schemas sc ON o.schema_id=sc.schema_id
-	    LEFT JOIN cteIndexStats i ON i.id = o.object_id
-	    LEFT JOIN cteColumnStats c ON c.id = o.object_id
-    WHERE OBJECTPROPERTY(o.object_id, 'IsUserTable') = 1
-    ORDER BY [Estimated Modification Counter] DESC
-	    , [Table]
-	    , [StatName]
-END
-";
+            DataSet dsHasDmDbStatsProperties = d.ExecuteWithResults("SELECT COUNT(*) AS hasDmDbStatsProperties FROM sys.all_objects WHERE name = 'dm_db_stats_properties'");
+            bool hasDmDbStatsProperties = false;
+            if (dsHasDmDbStatsProperties.Tables[0].Rows.Count > 0 && dsHasDmDbStatsProperties.Tables[0].Rows[0]["hasDmDbStatsProperties"].ToString() != "0")
+                hasDmDbStatsProperties = true;
+
+            DataSet dsHasIsIncremental = d.ExecuteWithResults("SELECT COUNT(*) AS hasIsIncremental FROM sys.all_columns c WHERE c.name = 'is_incremental' AND OBJECT_NAME(object_id) = 'stats'");
+            bool hasIsIncremental = false;
+            if (dsHasIsIncremental.Tables[0].Rows.Count > 0 && dsHasIsIncremental.Tables[0].Rows[0]["hasIsIncremental"].ToString() != "0")
+                hasIsIncremental = true;
+
+            DataSet dsHasIsTemporary = d.ExecuteWithResults("SELECT COUNT(*) AS hasIsTemporary FROM sys.all_columns c WHERE c.name = 'is_temporary' AND OBJECT_NAME(object_id) = 'stats'");
+            bool hasIsTemporary = false;
+            if (dsHasIsTemporary.Tables[0].Rows.Count > 0 && dsHasIsTemporary.Tables[0].Rows[0]["hasIsTemporary"].ToString() != "0")
+                hasIsTemporary = true;
+
+            string filterHasIncremental = string.Empty;
+            if (hasIsIncremental)
+                filterHasIncremental = " , s.is_incremental AS [Is Incremental] ";
+
+            string filterHasTemporary = string.Empty;
+            if (hasIsTemporary)
+                filterHasTemporary = " , s.is_temporary AS [Is Temporary] ";
+
+            string filterAutoCreated = string.Empty;
+            if (autoCreated.HasValue)
+            {
+                if (autoCreated.Value)
+                {
+                    filterAutoCreated = " AND s.auto_created = 1 ";
+                }
+                else
+                {
+                    filterAutoCreated = " AND s.auto_created = 0 ";
+                }
+            }
+            string filterLinkedToIndex = string.Empty;
+            string filterLinkedToIndex2 = string.Empty;
+            if (linkedToIndex.HasValue)
+            {
+                if (linkedToIndex.Value)
+                {
+                    filterLinkedToIndex = " AND i.index_id IS NOT NULL ";
+                    filterLinkedToIndex2 = " AND i.id IS NOT NULL ";
+                }
+                else
+                {
+                    filterLinkedToIndex = " AND i.index_id IS NULL ";
+                    filterLinkedToIndex2 = " AND i.id IS NULL ";
+                }
+            }
+
+            string sql = string.Format(@"SELECT sch.name + '.' + o.name AS [Table]
+	, s.name AS StatName
+	, STUFF((
+			SELECT
+				', ' + COL_NAME(sic.object_id, sic.column_id) AS [Name]
+			FROM sys.stats st
+				INNER JOIN sys.stats_columns sic ON sic.stats_id=st.stats_id
+					AND sic.object_id=st.object_id
+			WHERE st.stats_id = s.stats_id
+				AND st.object_id = s.object_id
+			FOR XML PATH(''), TYPE
+		).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS [Columns]
+	, sp.last_updated AS [Last Updated]
+	, sp.rows AS [Rows]
+	, sp.rows_sampled AS [Rows Sampled]
+	, sp.modification_counter AS [Modification Counter]
+	, CASE WHEN sp.rows > 0 THEN sp.modification_counter * 100 / sp.rows ELSE 0 END [Modification %]
+	, sp.unfiltered_rows AS [Unfiltered Rows]
+	, sp.steps AS [Steps]
+	, s.auto_created AS [Auto Created]
+	, s.user_created AS [User Created]
+	, s.has_filter AS [Has Filter]
+{0}
+{1}
+	, s.no_recompute AS [No Recompute]
+	, CASE WHEN i.index_id IS NULL THEN 'False' ELSE 'True' END AS [Is Index Linked]
+	, ius.user_seeks AS [User Seeks]
+	, ius.user_scans AS [User Scans]
+	, ius.user_lookups AS [User Lookups]
+	, ius.user_updates AS [User Updates]
+	, ius.last_user_seek AS [Last User Seek]
+	, ius.last_user_scan AS [Last User Scan]
+	, ius.last_user_lookup AS [Last User Lookup]
+	, ius.last_user_update AS [Last User Update]
+FROM sys.stats s
+	CROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) sp
+	INNER JOIN sys.objects o ON s.object_id = o.object_id
+	INNER JOIN sys.schemas sch ON o.schema_id = sch.schema_id
+	LEFT JOIN sys.indexes i on s.object_id = i.object_id
+	    AND s.name = i.name
+	LEFT JOIN sys.dm_db_index_usage_stats ius ON i.index_id = ius.index_id
+	    AND i.object_id = ius.object_id
+	    AND ius.database_id = DB_ID()
+WHERE OBJECTPROPERTY(o.object_id, 'IsUserTable') = 1
+{2}
+{3}
+ORDER BY modification_counter DESC
+    , [Table]
+    , StatName", filterHasIncremental, filterHasTemporary, filterAutoCreated, filterLinkedToIndex);
+
+            if(!hasDmDbStatsProperties)
+            {
+                sql = string.Format(@"WITH cteIndexStats AS
+(
+    SELECT id
+        , ind.name
+        , rowmodctr
+    FROM sys.sysindexes AS sysind
+        INNER JOIN sys.indexes AS ind ON sysind.id = ind.object_id
+            AND sysind.indid=ind.index_id
+),
+cteColumnStats AS
+(
+    SELECT id
+        , rowmodctr
+    FROM sys.sysindexes as sysind
+    WHERE sysind.indid in (0,1)
+)
+SELECT OBJECT_NAME(o.object_id) AS [Table]
+    , s.name AS StatName
+    , STUFF((
+        SELECT
+            ', ' + COL_NAME(sic.object_id, sic.column_id) AS [Name]
+        FROM sys.stats st
+            INNER JOIN sys.stats_columns sic ON sic.stats_id=st.stats_id
+                AND sic.object_id=st.object_id
+        WHERE st.stats_id = s.stats_id
+            AND st.object_id = s.object_id
+        FOR XML PATH(''), TYPE
+    ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS [Columns]
+    , STATS_DATE(s.object_id, s.stats_id) AS [Last Updated]
+    , ISNULL(i.rowmodctr, c.rowmodctr) AS [Estimated Modification Counter]
+    , s.auto_created AS [Auto Created]
+    , s.is_temporary AS [Is Temporary]
+    , s.no_recompute AS [No Recompute]
+FROM sys.stats s
+    INNER JOIN sys.objects o ON s.object_id=o.object_id
+    INNER JOIN sys.schemas sc ON o.schema_id=sc.schema_id
+    LEFT JOIN cteIndexStats i ON i.id = o.object_id
+    LEFT JOIN cteColumnStats c ON c.id = o.object_id
+WHERE OBJECTPROPERTY(o.object_id, 'IsUserTable') = 1
+{0}
+{1}
+ORDER BY [Estimated Modification Counter] DESC
+    , [Table]
+    , [StatName]", filterAutoCreated, filterLinkedToIndex2);
+            }
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
