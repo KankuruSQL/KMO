@@ -3,9 +3,9 @@
     public static class KVersion
     {
         public const int Sp2017 = 1000;
-        public const int Cu2017 = 1000;
+        public const int Cu2017 = 3008;
         public const int Sp2016 = 4001;
-        public const int Cu2016 = 4451;
+        public const int Cu2016 = 4457;
         public const int Sp2014 = 5000;
         public const int Cu2014 = 5557;
         public const int Sp2012 = 7001;
@@ -17,9 +17,9 @@
         public const int Sp2005 = 5000;
         public const int Cu2005 = 5324;
         public const string Sp2017Link = "https://www.microsoft.com/en-us/sql-server/sql-server-downloads";
-        public const string Cu2017Link = "https://www.microsoft.com/en-us/sql-server/sql-server-downloads";
+        public const string Cu2017Link = "https://support.microsoft.com/en-us/help/4052574";
         public const string Sp2016Link = "https://www.microsoft.com/en-us/download/details.aspx?id=54276";
-        public const string Cu2016Link = "https://support.microsoft.com/en-us/help/4040714";
+        public const string Cu2016Link = "https://support.microsoft.com/en-us/help/4037354";
         public const string Sp2014Link = "https://www.microsoft.com/en-us/download/details.aspx?id=53168";
         public const string Cu2014Link = "https://support.microsoft.com/en-us/help/4037356";
         public const string Sp2012Link = "https://www.microsoft.com/en-us/download/details.aspx?id=56040";
