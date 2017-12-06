@@ -344,24 +344,43 @@ OPTION (RECOMPILE)";
 
         #region Backups
         /// <summary>
-        /// For each DB, get the recovery model, the last backup full and the last restore
+        /// For each DB, get the recovery model, the last full backup date
+        /// , the last restore date and the last snapshot date
         /// </summary>
-        /// <param name="s">your smo server</param>
-        /// <returns>a DataTable with 1 datatable containing the result of the query</returns>
         public static DataTable GetBackupHistory(this smo.Server s)
         {
             smo.Database d = s.Databases["msdb"];
-            return d.ExecuteWithResults(@"SELECT sdb.name AS DatabaseName
-    , MAX(sdb.recovery_model_desc) as recoveryModel
-    , MAX(bus.backup_finish_date) AS LastBackUpTime
-	, MAX(rh.restore_date) as LastRestoreTime
-FROM sys.databases sdb (NOLOCK)
-    LEFT OUTER JOIN msdb.dbo.backupset bus (NOLOCK) ON bus.database_name = sdb.name 
-		AND COALESCE(bus.is_snapshot, 0) != 1 
+            return d.ExecuteWithResults(@"WITH cteBackup AS(
+	SELECT database_name
+		, MAX(bus.backup_finish_date) AS LastBackUpTime
+	FROM msdb.dbo.backupset bus
+	WHERE COALESCE(bus.is_snapshot, 0) != 1
 		AND COALESCE(bus.type, 'D') = 'D' 
-    LEFT join msdb.dbo.restorehistory rh (NOLOCK) on rh.destination_database_name = sdb.Name
-GROUP BY sdb.name
-ORDER BY sdb.name").Tables[0];
+	GROUP BY database_name
+),
+cteRestore AS (
+	SELECT rh.destination_database_name
+		, MAX(rh.restore_date) as LastRestoreTime
+	FROM msdb.dbo.restorehistory rh (NOLOCK)
+	GROUP BY rh.destination_database_name
+),
+cteSnapshot AS(
+	SELECT database_name
+		, MAX(bus.backup_finish_date) AS LastSnapshotTime
+	FROM msdb.dbo.backupset bus
+	WHERE bus.is_snapshot = 1
+	GROUP BY database_name
+)
+SELECT sdb.name AS DatabaseName
+    ,sdb.recovery_model_desc as recoveryModel
+	, cb.LastBackUpTime
+	, cr.LastRestoreTime
+	, cs.LastSnapshotTime
+FROM sys.databases sdb (NOLOCK)
+	LEFT JOIN cteBackup cb ON sdb.name = cb.database_name
+	LEFT JOIN cteRestore cr ON sdb.name = cr.destination_database_name
+	LEFT JOIN cteSnapshot cs ON sdb.name = cs.database_name
+ORDER BY DatabaseName").Tables[0];
         }
         #endregion
 
