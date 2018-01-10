@@ -133,24 +133,24 @@ END", startDate.ToString("yyyyMMdd hh:mm:ss"));
         WHEN 'I' THEN 'Differential'
         WHEN 'L' THEN 'Transaction Log'
         ELSE 'Other' 
-	END AS BackupType
-    , m.physical_device_name
-    , CAST(CAST(s.compressed_backup_size / 1048576 AS INT) AS VARCHAR(20)) + ' ' + 'MB' AS bkSize
-    , CAST(CAST(100 - (compressed_backup_size / backup_size * 100) as DECIMAL(9,2)) as VARCHAR(10)) + ' %' AS ratiocompression
-    , CAST(DATEDIFF(SECOND, s.backup_start_date, s.backup_finish_date) AS VARCHAR(5)) + ' ' + 'Seconds' AS TimeTaken
-    , s.backup_start_date
-    , s.backup_finish_date
-	, s.first_lsn AS first_lsn
-	, s.last_lsn AS last_lsn
-    , CAST(s.compressed_backup_size / 1048576 as INT) as bkSizeInt
-    , DATEDIFF(second, s.backup_start_date, s.backup_finish_date) TimeTakenInt
+	END AS [Backup Type]
+    , m.physical_device_name AS [Physical Device Name]
+    , CAST(CAST(s.compressed_backup_size / 1048576 AS INT) AS VARCHAR(20)) + ' ' + 'MB' AS [Backup Size (MB)]
+    , CAST(CAST(100 - (compressed_backup_size / backup_size * 100) as DECIMAL(9,2)) as VARCHAR(10)) + ' %' AS [Compression Ratio]
+    , CAST(DATEDIFF(SECOND, s.backup_start_date, s.backup_finish_date) AS VARCHAR(5)) + ' ' + 'Seconds' AS [Time Taken]
+    , s.backup_start_date AS [Backup Start Date]
+    , s.backup_finish_date AS [Backup Finish Date]
+	, s.first_lsn AS [First LSN]
+	, s.last_lsn AS [Last LSN]
+    , CAST(s.compressed_backup_size / 1048576 as INT) as __bkSizeInt
+    , DATEDIFF(second, s.backup_start_date, s.backup_finish_date) __TimeTakenInt
     , CASE s.[type]
 		WHEN 'D' THEN 
 			CASE WHEN s.is_snapshot = 1 THEN '#327AC1FF' ELSE '#32FF0000' END
         WHEN 'I' THEN '#320AFF0E'
         WHEN 'L' THEN '#32FFFF00'
         ELSE '#00000000'
-    END AS rowColor
+    END AS __rowColor
 FROM msdb.dbo.backupset s (NOLOCK)
     INNER JOIN msdb.dbo.backupmediafamily m (NOLOCK) ON s.media_set_id = m.media_set_id
 WHERE s.database_name = '{1}'
@@ -164,23 +164,23 @@ ORDER BY backup_start_date DESC
         WHEN 'I' THEN 'Differential'
         WHEN 'L' THEN 'Transaction Log'
         ELSE 'Other'
-    END AS BackupType
-    , m.physical_device_name
-    , CAST(CAST(s.backup_size / 1048576 AS INT) AS VARCHAR(20)) + ' ' + 'MB' AS bkSize
-    , '-' as ratiocompression
-    , CAST(DATEDIFF(SECOND, s.backup_start_date, s.backup_finish_date) AS VARCHAR(5)) + ' ' + 'Seconds' AS TimeTaken,
-    , s.backup_start_date
-    , s.backup_finish_date
-	, s.first_lsn AS first_lsn
-	, s.last_lsn AS last_lsn
-    , CAST(s.backup_size / 1048576 as INT) as bkSizeInt
-    , DATEDIFF(second, s.backup_start_date, s.backup_finish_date) TimeTakenInt
+    END AS [Backup Type]
+    , m.physical_device_name AS [Physical Device Name]
+    , CAST(CAST(s.backup_size / 1048576 AS INT) AS VARCHAR(20)) + ' ' + 'MB' AS [Backup Size (MB)]
+    , '-' AS [Compression Ratio]
+    , CAST(DATEDIFF(SECOND, s.backup_start_date, s.backup_finish_date) AS VARCHAR(5)) + ' ' + 'Seconds' AS [Time Taken],
+    , s.backup_start_date AS [Backup Start Date]
+    , s.backup_finish_date AS [Backup Finish Date]
+	, s.first_lsn AS [First LSN]
+	, s.last_lsn AS [Last LSN]
+    , CAST(s.backup_size / 1048576 as INT) as __bkSizeInt
+    , DATEDIFF(second, s.backup_start_date, s.backup_finish_date) __TimeTakenInt
     , CASE s.[type]
         WHEN 'D' THEN '#32FF0000'
         WHEN 'I' THEN '#320AFF0E'
         WHEN 'L' THEN '#32FFFF00'
         ELSE '#00000000'
-    END AS rowColor
+    END AS __rowColor
 FROM msdb.dbo.backupset s (NOLOCK)
     INNER JOIN msdb.dbo.backupmediafamily m (NOLOCK) ON s.media_set_id = m.media_set_id
 WHERE s.database_name = {1}
