@@ -935,6 +935,22 @@ DROP TABLE #KMOLoginFailed", logFileNumber, startTime.ToString("yyyyMMdd HH:mm:s
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
+        /// <summary>
+        /// Read Database Mail Error log
+        /// </summary>
+        public static DataTable GetDatabaseMailErrorLog(this smo.Server s, DateTime startTime, DateTime endTime)
+        {
+            string sql = string.Format(@"SELECT log_date AS [Date]
+    , description AS [Description]
+FROM msdb.dbo.sysmail_log
+WHERE event_type != 1
+    AND log_date >= '{0}' 
+    AND log_date < '{1}'"
+, startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"));
+
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
         #endregion
 
         #region Queries
