@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Text;
+using static KMO.Enums;
 using smo = Microsoft.SqlServer.Management.Smo;
 
 namespace KMO
@@ -656,6 +657,100 @@ DROP TABLE #drives";
             smo.Database d = s.Databases["master"];
             return d.ExecuteWithResults(sql).Tables[0];
         }
+
+        /// <summary>
+        /// Get the size of each data or log files for each databases
+        /// </summary>
+        /// <param name="s">the smo server object</param>
+        /// <param name="fileType">Enum available in KMO.Enums</param>
+        public static DataTable GetFileSize(this smo.Server s, FileType fileType)
+        {
+            string sqlFileType = " WHERE b.type != 1 ";
+            if(fileType == FileType.Logs)
+            {
+                sqlFileType = " WHERE b.type = 1 ";
+            }
+            string sql = string.Format(@"CREATE TABLE #TMPLASTFILECHANGE 
+(
+	databasename nvarchar(128)
+	, filename nvarchar(128)
+	, endtime datetime
+)
+
+DECLARE @path NVARCHAR(1000)
+SELECT @path = SUBSTRING(path, 1, LEN(path) - CHARINDEX('\', REVERSE(path))) + '\log.trc'
+FROM sys.traces
+WHERE id = 1;
+
+WITH CTE (databaseid, filename, EndTime)
+AS
+(
+	SELECT DatabaseID
+		, FileName
+		, MAX(t.EndTime) AS EndTime
+	FROM ::fn_trace_gettable(@path, default ) t
+	WHERE EventClass IN (92, 93)
+		AND DATEDIFF(hh,StartTime,GETDATE()) < 24
+	GROUP BY DatabaseID
+		, FileName
+)
+INSERT INTO #TMPLASTFILECHANGE
+(
+	databasename
+	, filename
+	, endtime
+)
+SELECT DB_NAME(database_id) AS DatabaseName
+	, mf.name AS LogicalName
+	, cte.EndTime
+FROM sys.master_files mf
+	LEFT JOIN CTE cte on mf.database_id=cte.databaseid 
+		AND mf.name=cte.filename
+WHERE cte.EndTime IS NOT NULL
+
+CREATE TABLE #TMPSPACEUSED 
+(
+	DBNAME    NVARCHAR(128),
+	FILENAME   NVARCHAR(128),
+	SPACEUSED FLOAT
+)
+
+INSERT INTO #TMPSPACEUSED
+(
+	DBNAME
+	, FILENAME
+	, SPACEUSED
+)
+EXEC('sp_MSforeachdb''use [?]; Select ''''?'''' AS DBName
+			, Name AS FileNme
+			, fileproperty(Name,''''SpaceUsed'''') AS SpaceUsed 
+		FROM sys.sysfiles''')
+
+SELECT a.name AS [Database]
+	, b.name AS [Logical File Name]
+	, a.recovery_model_desc AS [Recovery Model]
+	, CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) AS [File Size]
+	, CAST((d.SPACEUSED / 128.0) AS DECIMAL(15,2)) AS [Used Space MB]
+	, CAST((b.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) AS [Free Space MB]
+	, CAST((b.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) / CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) * 100 AS [Free Space %]
+	, c.endtime AS [Last Auto Growth]
+	, b.physical_name AS [Physical Name]
+	, CASE WHEN a.state = 6 THEN '#33FF5B66' END AS __rowColor
+FROM sys.databases a
+	INNER JOIN sys.master_files b ON a.database_id = b.database_id
+	LEFT JOIN #TMPSPACEUSED d  ON a.name = d.DBNAME 
+		AND b.name = d.FILENAME
+	LEFT JOIN #TMPLASTFILECHANGE c on a.name = c.databasename 
+		AND b.name = c.filename
+{0}
+ORDER BY [File Size] DESC
+
+DROP TABLE #TMPSPACEUSED
+DROP TABLE #TMPLASTFILECHANGE", sqlFileType);
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
         #endregion
 
         #region CPU
