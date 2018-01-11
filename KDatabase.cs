@@ -140,8 +140,8 @@ END", startDate.ToString("yyyyMMdd hh:mm:ss"));
     , CAST(DATEDIFF(SECOND, s.backup_start_date, s.backup_finish_date) AS VARCHAR(5)) + ' ' + 'Seconds' AS [Time Taken]
     , s.backup_start_date AS [Backup Start Date]
     , s.backup_finish_date AS [Backup Finish Date]
-	, s.first_lsn AS [First LSN]
-	, s.last_lsn AS [Last LSN]
+	, CAST(s.first_lsn AS VARCHAR(25)) AS [First LSN]
+	, CAST(s.last_lsn AS VARCHAR(25)) AS [Last LSN]
     , CAST(s.compressed_backup_size / 1048576 as INT) as __bkSizeInt
     , DATEDIFF(second, s.backup_start_date, s.backup_finish_date) __TimeTakenInt
     , CASE s.[type]
