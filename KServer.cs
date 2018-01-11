@@ -299,8 +299,8 @@ GROUP BY database_id
         public static DataTable GetLiveQueriesProfiler(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
-            string _sql = @"SELECT COALESCE(qt.dbid, 0) AS [Database ID]
-	, COALESCE(DB_NAME(qt.dbid), 'NC.') AS [Database Name]
+            string sql = @"SELECT COALESCE(qp.dbid, 0) AS [Database ID]
+	, COALESCE(DB_NAME(qp.dbid), 'NC.') AS [Database Name]
 	, qt.text AS [Query]
     , SUM(total_worker_time) AS [Cpu]
     , SUM(total_elapsed_time) AS [Elapsed Time]
@@ -310,11 +310,12 @@ GROUP BY database_id
     , SUM(total_logical_writes) AS [Logical Writes]
 FROM sys.dm_exec_query_stats qs
 	CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) AS qt
-WHERE qt.dbid != 32767
-	OR qt.dbid IS NULL
-GROUP BY qt.dbid
+    CROSS APPLY sys.dm_exec_query_plan(qs.plan_handle) AS qp
+WHERE qp.dbid != 32767
+	OR qp.dbid IS NULL
+GROUP BY qp.dbid
 	, qt.text";
-            return d.ExecuteWithResults(_sql).Tables[0];
+            return d.ExecuteWithResults(sql).Tables[0];
         }
 
         /// <summary>
