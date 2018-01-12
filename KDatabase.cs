@@ -233,77 +233,105 @@ WHERE NOT EXISTS (
         /// <returns>a DataTable with the result of the query.</returns>
         public static DataTable GetDuplicatedIndex(this smo.Database d)
         {
-            string sql = @"WITH t0 AS (
-	SELECT ic.object_id
-		, index_id
-		, c.column_id
-		, key_ordinal
-		, CASE is_descending_key WHEN '0' THEN 'asc' WHEN '1' THEN 'desc' END AS orderkey
-		, c.name AS column_name
-		, ROW_NUMBER() OVER(PARTITION BY ic.object_id, index_id ORDER BY key_ordinal DESC) AS n
-	FROM sys.index_columns AS ic  (NOLOCK)
-		INNER JOIN sys.columns AS c (NOLOCK) ON ic.object_id = c.object_id
-			AND ic.column_id = c.column_id
-	WHERE key_ordinal > 0
-		AND index_id > 0)
-, t1 AS (
-	SELECT object_id 
-		, index_id 
-		, column_id 
-		, key_ordinal 
-		, n 
-		, CAST(column_name as VARCHAR(MAX)) + ' ' + orderkey AS comp_litterale 
-		, CAST(column_id as VARCHAR(MAX)) + SUBSTRING(orderkey , 1 , 1) AS comp_math 
-		, MAX(n) OVER(PARTITION BY object_id, index_id) AS cmax
-	FROM t0 
-	WHERE key_ordinal = 1 
-	UNION ALL
-	SELECT t0.object_id 
-		, t0.index_id 
-		, t0.column_id 
-		, t0.key_ordinal 
-		, t0.n 
-		, comp_litterale + ', ' + CAST(t0.column_name as VARCHAR(MAX)) + ' ' + t0.orderkey
-		, comp_math + CAST(t0.column_id as VARCHAR(MAX)) + SUBSTRING (t0.orderkey , 1 , 1)
-		, t1.cmax
-	FROM t0 
-		INNER JOIN t1 ON t0.object_id = t1.object_id 
-			AND t0.index_id = t1.index_id 
-			AND t0.key_ordinal = t1.key_ordinal + 1) 
-, t2 as (
-	SELECT object_id 
-		, index_id 
-		, comp_litterale 
-		, comp_math 
-		, cmax 
-	FROM t1 
-	WHERE n = 1) 
-, t4 as (
-	SELECT t2.object_id 
-		, t2.index_id 
-		, t3.index_id as index_id_anomalie 
-		, t2.comp_litterale as clef_index 
-		, t3.comp_litterale as clef_index_anormal 
-		, ABS(t2.cmax - t3.cmax) as distance 
-	FROM t2 
-		INNER JOIN t2 as t3 ON t2.object_id = t3.object_id 
-		AND t2.index_id <> t3.index_id 
-		AND t2.comp_math = t3.comp_math) 
+            string sqlFilter = @", i1.filter_definition AS [Filter Definition]
+, i2.filter_definition AS [Similar Filter Definition] ";
 
-SELECT s.name +'.' + o.name as [Table] 
-	, i1.name as [Index]
-	, i2.name as [Similar Index]
-	, t4.clef_index_anormal as [Columns]
-FROM t4 
-	INNER JOIN sys.objects as o (nolock) ON t4.object_id = o.object_id 
-	INNER JOIN sys.schemas as s (nolock) ON o.schema_id = s.schema_id 
-	INNER JOIN sys.indexes as i1 (nolock) ON t4.object_id = i1.object_id 
-		AND t4.index_id = i1.index_id 
-	INNER JOIN sys.indexes as i2 (nolock) ON t4.object_id = i2.object_id 
-		AND t4.index_id_anomalie = i2.index_id 
-WHERE o.type IN ('u' , 'v') 
-ORDER by [Table]
-	, [Index]";
+            if (d.Parent.Version.Major < 10)
+                sqlFilter = string.Empty;
+
+            string sql = string.Format(@"WITH T0 AS (
+    SELECT ic.object_id
+        , index_id
+        , c.column_id
+        , key_ordinal
+        ,  CASE is_descending_key
+                WHEN '0' THEN 'ASC'
+                WHEN '1' THEN 'DESC'
+            END AS sens
+        , c.name AS column_name
+        , ROW_NUMBER() OVER(PARTITION BY ic.object_id, index_id ORDER BY key_ordinal DESC) AS N
+        , is_included_column
+    FROM sys.index_columns AS ic
+        INNER JOIN sys.columns AS c ON ic.object_id = c.object_id
+            AND ic.column_id = c.column_id
+    WHERE key_ordinal > 0
+        AND  index_id > 0)
+, T1 AS (
+    SELECT object_id
+        , index_id
+        , column_id
+        , key_ordinal
+        , N
+        , CASE WHEN is_included_column = 0 THEN CAST(column_name AS VARCHAR(MAX)) + ' ' + sens ELSE '' END AS LitteralComp
+        , CASE WHEN is_included_column = 0 THEN CAST(column_id AS VARCHAR(MAX)) + SUBSTRING(sens, 1, 1) ELSE '' END AS MathComp
+        , MAX(N) OVER(PARTITION BY object_id, index_id) AS CMax
+        , CASE WHEN is_included_column = 1 THEN CAST(column_name AS VARCHAR(MAX)) ELSE '' END AS IncludedColumns
+    FROM T0
+    WHERE key_ordinal = 1
+    UNION  ALL
+    SELECT T0.object_id
+        , T0.index_id
+        , T0.column_id
+        , T0.key_ordinal
+        , T0.N
+        , LitteralComp + CASE WHEN is_included_column = 0 THEN  ', ' + CAST(T0.column_name AS VARCHAR(MAX)) + ' ' + T0.sens ELSE '' END
+        , MathComp + CASE WHEN is_included_column = 0 THEN CAST(T0.column_id AS VARCHAR(MAX)) + SUBSTRING(T0.sens, 1, 1) ELSE '' END
+        , T1.CMax, IncludedColumns + CASE WHEN is_included_column = 1 THEN ', ' + CAST(column_name AS VARCHAR(MAX)) ELSE '' END
+    FROM T0
+        INNER JOIN T1 ON T0.object_id = T1.object_id
+            AND T0.index_id = T1.index_id
+            AND T0.key_ordinal = T1.key_ordinal + 1)
+, T2 AS (
+    SELECT object_id
+        , index_id
+        , LitteralComp
+        , MathComp
+        , CMax
+        , IncludedColumns
+    FROM T1
+    WHERE N = 1)
+, T4 AS (
+    SELECT T2.object_id
+        , T2.index_id
+        , T3.index_id AS index_id_anomalie
+        , T2.LitteralComp AS IndexKey
+        , T3.LitteralComp AS SimilarIndexKey
+        , T2.IncludedColumns
+        , T3.IncludedColumns AS SimilarIncludedColumns
+        , CASE WHEN T2.MathComp = T3.MathComp THEN 'Duplicated' WHEN T2.MathComp LIKE T3.MathComp +'%' THEN 'Included' END AS DuplicationType
+        , ABS(T2.CMax - T3.CMax) AS Distance
+    FROM T2
+        INNER JOIN T2 AS T3 ON T2.object_id = T3.object_id
+            AND T2.index_id <> T3.index_id
+            AND T2.MathComp LIKE T3.MathComp +'%')
+SELECT s.name +'.' + o.name AS [Table Name]
+    , i1.name AS [Index Name]
+    , i2.name AS [Similar Index]
+    , T4.DuplicationType AS [Duplication Type]
+    , T4.Distance
+    , T4.IndexKey AS [Index Key]
+    , T4.SimilarIndexKey AS [Similar Index Key]
+    , T4.IncludedColumns AS [Included Columns]
+    , T4.SimilarIncludedColumns AS [Similar IncludedColumns]
+{0}
+	, i1.type_desc AS [Index Type]
+	, i2.type_desc AS [Similar Index Type]
+    , i1.is_primary_key AS [Is Primary Key]
+    , i2.is_primary_key AS [Is Primary Key Similar]
+    , i1.is_unique AS [Is Unique Index]
+    , i2.is_unique AS [Is Unique Similar Index]
+    , i1.is_unique_constraint AS [Is Unique Constraint]
+    , i2.is_unique_constraint AS [Is Unique Constraint Similar]
+FROM T4
+    INNER JOIN sys.objects AS o ON T4.object_id = o.object_id
+    INNER JOIN sys.schemas AS s ON o.schema_id = s.schema_id
+    INNER JOIN sys.indexes AS i1 ON T4.object_id = i1.object_id
+        AND T4.index_id = i1.index_id
+    INNER JOIN sys.indexes AS i2 ON T4.object_id = i2.object_id
+        AND T4.index_id_anomalie = i2.index_id
+WHERE o.type IN ('U', 'V')
+ORDER  BY [Table Name]
+    , [Index Name]", sqlFilter);
             return d.ExecuteWithResults(sql).Tables[0];
         }
 
