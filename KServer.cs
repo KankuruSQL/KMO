@@ -875,16 +875,11 @@ OPTION (RECOMPILE)";
 		{0}
 )
 SELECT
-	MAX ([W1].[wait_type]) AS [wait_type],
-	MAX ([W1].[Category]) AS [Category],
-	CAST (MAX ([W1].[WaitS]) AS DECIMAL (16,2)) AS [wait_time_s],
-	CAST (MAX ([W1].[ResourceS]) AS DECIMAL (16,2)) AS [Resource_S],
-	CAST (MAX ([W1].[SignalS]) AS DECIMAL (16,2)) AS [Signal_S],
-	MAX ([W1].[WaitCount]) AS [waiting_tasks_count],
-	CAST (MAX ([W1].[Percentage]) AS DECIMAL (5,2)) AS [pct],
-	CAST ((MAX ([W1].[WaitS]) / MAX ([W1].[WaitCount])) AS DECIMAL (16,4)) AS [AvgWait_S],
-	CAST ((MAX ([W1].[ResourceS]) / MAX ([W1].[WaitCount])) AS DECIMAL (16,4)) AS [AvgRes_S],
-	CAST ((MAX ([W1].[SignalS]) / MAX ([W1].[WaitCount])) AS DECIMAL (16,4)) AS [AvgSig_S]
+	MAX ([W1].[wait_type]) AS [Wait Type]
+	, MAX ([W1].[Category]) AS [Category]
+	, MAX ([W1].[WaitCount]) AS [Tasks Count]
+	, CAST (MAX ([W1].[WaitS]) AS DECIMAL (16,2)) AS [Wait Time]
+	, CAST (MAX ([W1].[Percentage]) AS DECIMAL (5,2)) AS [Wait Percent]
 FROM [Waits] AS [W1]
 	INNER JOIN [Waits] AS [W2] ON [W2].[RowNum] <= [W1].[RowNum]
 GROUP BY [W1].[RowNum]
@@ -893,7 +888,7 @@ HAVING SUM ([W2].[Percentage]) - MAX ([W1].[Percentage]) < 99;", sqlIgnore);
             dt.Columns.Add(new DataColumn("Description"));
             foreach (DataRow dr in dt.Rows)
             {
-                string waitType = dr["wait_type"].ToString();
+                string waitType = dr["Wait Type"].ToString();
                 dr["Description"] = (from l in Resources.WaitTypes.GetWaitsDictionary()
                                      where l.Key == waitType
                                      select l.Value).SingleOrDefault();
