@@ -543,6 +543,80 @@ ORDER BY typeName
             return d.ExecuteWithResults(_sql).Tables[0];
         }
 
+        /// <summary>
+        /// Get Disabled index list in the database
+        /// </summary>
+        public static DataTable GetDisabledIndex(this smo.Database d)
+        {
+            string sqlFilter = @", i.filter_definition ";
+
+            if (d.Parent.Version.Major < 10)
+                sqlFilter = string.Empty;
+            string sql = string.Format(@"WITH cteCol(index_id, object_id, schema_name, table_name, index_name, index_column_id, column_name)
+AS(
+	SELECT i.index_id
+		, i.object_id
+		, s.name AS schema_name
+		, t.name AS table_name
+		, i.name AS index_name
+		, index_column_id
+		, CAST(c.name AS VARCHAR(MAX)) AS column_name
+	FROM sys.tables t
+		INNER JOIN sys.schemas s on t.schema_id = s.schema_id
+		INNER JOIN sys.indexes i on i.object_id = t.object_id
+		INNER JOIN sys.index_columns ic on ic.object_id = t.object_id
+			AND ic.index_id=i.index_id
+		INNER JOIN sys.columns c on c.object_id = t.object_id
+			AND ic.column_id = c.column_id
+    WHERE ic.index_column_id = 1
+		AND i.is_disabled = 1
+UNION ALL
+	SELECT i.index_id
+		, i.object_id
+		, s.name
+		, t.name
+		, i.name
+		, ic.index_column_id
+		, CAST(cteCol.column_name + ',' + c.name AS VARCHAR(MAX))
+	FROM sys.tables t
+		INNER JOIN sys.schemas s on t.schema_id = s.schema_id
+		INNER JOIN sys.indexes i on i.object_id = t.object_id
+		INNER JOIN sys.index_columns ic on ic.object_id = t.object_id
+			AND ic.index_id = i.index_id
+		INNER JOIN sys.columns c on c.object_id = t.object_id
+			AND ic.column_id = c.column_id
+		INNER JOIN cteCol on cteCol.index_column_id + 1 = ic.index_column_id
+			AND cteCol.schema_name = s.name
+			AND cteCol.table_name = t.name
+			AND cteCol.index_name = i.name
+	WHERE i.is_disabled = 1)
+SELECT cteCol.schema_name + '.' + cteCol.table_name AS [Table Name]
+	, cteCol.index_name AS [Index Name]
+	, cteCol.column_name AS [Column Name]
+	, i.type_desc
+	, i.is_unique
+{0}
+FROM cteCol
+	INNER JOIN (
+		SELECT schema_name
+			, table_name
+			, index_name
+			, MAX(index_column_id) index_column_id
+		FROM cteCol
+		GROUP BY schema_name
+		, table_name
+		, index_name) mx ON cteCol.schema_name = mx.schema_name
+			AND cteCol.table_name = mx.table_name
+			AND cteCol.index_name = mx.index_name
+			AND cteCol.index_column_id = mx.index_column_id
+	INNER JOIN sys.indexes i ON cteCol.index_id = i.index_id
+		AND cteCol.object_id = i.object_id
+ORDER BY [Table Name]
+	, [Index Name]
+	, [Column Name]", sqlFilter);
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
         #endregion
 
         #region Memory
