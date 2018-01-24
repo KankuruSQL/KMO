@@ -736,7 +736,7 @@ SELECT a.name AS [Database]
 	, CAST((b.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) / CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) * 100 AS [Free Space %]
 	, c.endtime AS [Last Auto Growth]
 	, b.physical_name AS [Physical Name]
-	, CASE WHEN a.state = 6 THEN '#33FF5B66' END AS __rowColor
+	, CASE WHEN a.state != 0 THEN '#33FF5B66' END AS __rowColor
 FROM sys.databases a
 	INNER JOIN sys.master_files b ON a.database_id = b.database_id
 	LEFT JOIN #TMPSPACEUSED d  ON a.name = d.DBNAME 
