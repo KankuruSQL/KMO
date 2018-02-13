@@ -2099,5 +2099,71 @@ WHERE group_id = '{0}'";
         }
 
         #endregion
+
+        #region Trace
+        /// <summary>
+        /// Read the default trace
+        /// https://docs.microsoft.com/fr-fr/sql/relational-databases/system-functions/sys-fn-trace-gettable-transact-sql
+        /// You need the ALTER TRACE permission on the server
+        /// </summary>
+        /// <param name="s">the smo server</param>
+        /// <param name="startTime">Start date filter</param>
+        /// <param name="endTime">End date filter</param>
+        /// <param name="topRows">Maximum row count</param>
+        /// <param name="category">filter by category. Category ID from sys.trace_categories</param>
+        public static DataTable ReadDefaultTrace(this smo.Server s, DateTime startTime, DateTime endTime, int topRows = 1000, int category = 0)
+        {
+            string categoryFilter = string.Empty;
+            if(category != 0)
+            {
+                categoryFilter = string.Format(" AND c.category_id = {0}", category);
+            }
+            string sql = string.Format(@"DECLARE @PATH NVARCHAR(1000)
+SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX('\', REVERSE(path))) + '\log.trc'
+FROM sys.traces
+WHERE id = 1;
+
+SELECT TOP ({0}) t.StartTime AS [Start Time]
+	, t.EndTime AS [End Time]
+	, c.name AS [Category]
+	, e.name AS [Event Class]
+	, v.subclass_name AS [Sub Class]
+	, t.TextData AS [Text Data]
+	, t.LoginName AS [Login]
+	, t.HostName AS [Hostname]
+	, t.ApplicationName AS [Application Name]
+	, t.DatabaseName AS [Database]
+	, t.ObjectName AS [Object]
+FROM ::fn_trace_gettable(@PATH, default ) t
+	INNER JOIN sys.trace_events e ON t.EventClass = e.trace_event_id
+	INNER JOIN sys.trace_categories c ON e.category_id = c.category_id
+	LEFT JOIN sys.trace_subclass_values v ON t.EventSubClass = v.subclass_value AND t.EventClass = v.trace_event_id
+WHERE StartTime BETWEEN '{1}' AND '{2}'
+    AND (t.TextData IS NULL
+		OR (t.TextData NOT LIKE '%FROM ::fn_trace_gettable(@PATH, default ) t%'
+	        AND t.TextData NOT LIKE '%SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX%'))
+{3}
+ORDER BY t.StartTime DESC
+	, t.EndTime DESC"
+, topRows, startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"), categoryFilter);
+
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        /// <summary>
+        /// Get trace categories from sys.trace_categories
+        /// Used in the Default trace tool
+        /// </summary>
+        public static DataTable GetTraceCategories(this smo.Server s)
+        {
+            string sql = @"SELECT category_id
+	, name
+FROM sys.trace_categories
+ORDER BY name";
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+        #endregion
     }
 }
