@@ -2128,12 +2128,12 @@ SELECT TOP ({0}) t.StartTime AS [Start Time]
 	, c.name AS [Category]
 	, e.name AS [Event Class]
 	, v.subclass_name AS [Sub Class]
-	, t.TextData AS [Text Data]
 	, t.LoginName AS [Login]
 	, t.HostName AS [Hostname]
 	, t.ApplicationName AS [Application Name]
 	, t.DatabaseName AS [Database]
 	, t.ObjectName AS [Object]
+	, t.TextData AS [Text Data]
 FROM ::fn_trace_gettable(@PATH, default ) t
 	INNER JOIN sys.trace_events e ON t.EventClass = e.trace_event_id
 	INNER JOIN sys.trace_categories c ON e.category_id = c.category_id
@@ -2161,6 +2161,58 @@ ORDER BY t.StartTime DESC
 	, name
 FROM sys.trace_categories
 ORDER BY name";
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        /// <summary>
+        /// Get rowcount from default trace group by Category
+        /// </summary>
+        public static DataTable DefaultTraceCountByCategory(this smo.Server s, DateTime startTime, DateTime endTime)
+        {
+            string sql = string.Format(@"DECLARE @PATH NVARCHAR(1000)
+SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX('\', REVERSE(path))) + '\log.trc'
+FROM sys.traces
+WHERE id = 1;
+
+SELECT c.name AS [Category]
+    , COUNT(*) AS [Count]
+FROM ::fn_trace_gettable(@PATH, default ) t
+	INNER JOIN sys.trace_events e ON t.EventClass = e.trace_event_id
+	INNER JOIN sys.trace_categories c ON e.category_id = c.category_id
+WHERE StartTime BETWEEN '{0}' AND '{1}'
+    AND (t.TextData IS NULL
+		OR (t.TextData NOT LIKE '%FROM ::fn_trace_gettable(@PATH, default ) t%'
+	        AND t.TextData NOT LIKE '%SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX%'))
+GROUP BY c.name"
+, startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"));
+
+            smo.Database d = s.Databases["master"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        /// <summary>
+        /// Get rowcount from default trace group by Event
+        /// </summary>
+        public static DataTable DefaultTraceCountByEvent(this smo.Server s, DateTime startTime, DateTime endTime)
+        {
+            string sql = string.Format(@"DECLARE @PATH NVARCHAR(1000)
+SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX('\', REVERSE(path))) + '\log.trc'
+FROM sys.traces
+WHERE id = 1;
+
+SELECT e.name AS [Category]
+    , COUNT(*) AS [Count]
+FROM ::fn_trace_gettable(@PATH, default ) t
+	INNER JOIN sys.trace_events e ON t.EventClass = e.trace_event_id
+	INNER JOIN sys.trace_categories c ON e.category_id = c.category_id
+WHERE StartTime BETWEEN '{0}' AND '{1}'
+    AND (t.TextData IS NULL
+		OR (t.TextData NOT LIKE '%FROM ::fn_trace_gettable(@PATH, default ) t%'
+	        AND t.TextData NOT LIKE '%SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX%'))
+GROUP BY e.name"
+, startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"));
+
             smo.Database d = s.Databases["master"];
             return d.ExecuteWithResults(sql).Tables[0];
         }
