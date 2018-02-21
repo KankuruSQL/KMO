@@ -730,15 +730,17 @@ EXEC('sp_MSforeachdb''use [?]; Select ''''?'''' AS DBName
 SELECT a.name AS [Database]
 	, b.name AS [Logical File Name]
 	, a.recovery_model_desc AS [Recovery Model]
-	, CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) AS [File Size]
+	, CASE WHEN a.database_id = 2 THEN CAST((z.size * 8 / 1024.0) AS DECIMAL(18,2)) ELSE CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) END AS [File Size]
 	, CAST((d.SPACEUSED / 128.0) AS DECIMAL(15,2)) AS [Used Space MB]
-	, CAST((b.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) AS [Free Space MB]
-	, CAST((b.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) / CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) * 100 AS [Free Space %]
+	, CASE WHEN a.database_id = 2 THEN CAST((z.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) ELSE CAST((b.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) END AS [Free Space MB]
+	, CASE WHEN a.database_id = 2 THEN CAST((z.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) / CAST((z.size * 8 / 1024.0) AS DECIMAL(18,2)) * 100 ELSE CAST((b.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) / CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) * 100 END AS [Free Space %]
 	, c.endtime AS [Last Auto Growth]
 	, b.physical_name AS [Physical Name]
 	, CASE WHEN a.state != 0 THEN '#33FF5B66' END AS __rowColor
 FROM sys.databases a
 	INNER JOIN sys.master_files b ON a.database_id = b.database_id
+    LEFT JOIN tempdb.sys.database_files z with (nolock) ON b.file_id = z.file_id
+        AND b.database_id = 2
 	LEFT JOIN #TMPSPACEUSED d  ON a.name = d.DBNAME 
 		AND b.name = d.FILENAME
 	LEFT JOIN #TMPLASTFILECHANGE c on a.name = c.databasename 
