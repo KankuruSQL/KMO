@@ -2219,5 +2219,67 @@ GROUP BY e.name"
             return d.ExecuteWithResults(sql).Tables[0];
         }
         #endregion
+
+        #region Jobs
+        /// <summary>
+        /// Get the detailed job log from SQL Server Agent
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <param name="startTime">job executed after this date</param>
+        /// <param name="endTime">job executed before this date</param>
+        /// <param name="errorOnly">If true, you won't get successful execution log</param>
+        /// <returns></returns>
+        public static DataTable GetJobLog(this smo.Server s, DateTime startTime, DateTime endTime, bool errorOnly)
+        {
+            string filterStatus = string.Empty;
+            if (errorOnly)
+                filterStatus = " AND h.run_status != 1 ";
+
+            string sql = string.Format(@"WITH ctejob AS (
+	SELECT j.job_id
+		, cat.name AS categoryname
+		, isnull(j.name, j.job_id) AS jobname
+		, dbo.agent_datetime(h.run_date, h.run_time) AS agentDateTime
+		, s.step_id
+		, isnull(s.step_name, s.step_id) AS stepname
+		, h.run_status
+		, STUFF(STUFF(STUFF(RIGHT(REPLICATE('0', 8) + CAST(h.run_duration AS VARCHAR(8)), 8), 3, 0, ':'), 6, 0, ':'), 9, 0, ':') AS readableRunDuration
+        , ((h.run_duration / 10000)*3600) + (((h.run_duration / 100) % 100) * 60) +( (h.run_duration) % 100) AS runDurationSecond
+		, h.message
+		, j.enabled AS jobenabled
+        , h.retries_attempted
+	FROM msdb.dbo.sysjobs j
+		LEFT JOIN msdb.dbo.sysjobsteps s on j.job_id = s.job_id
+		LEFT JOIN msdb.dbo.syscategories cat on j.category_id = cat.category_id
+		INNER JOIN msdb.dbo.sysjobhistory h on s.job_id = h.job_id and s.step_id = h.step_id
+	WHERE run_date BETWEEN {0} AND {1}
+		{2}
+)
+SELECT jobname AS [Job Name]
+	, stepname AS [Step Name]
+	, agentDateTime AS [Start Run Date]
+    , DATEADD(SS, runDurationSecond, agentDateTime) AS [End Run Date]
+    , readableRunDuration AS [Run Duration]
+    , categoryname AS [Category]
+	, CASE WHEN run_status = 0 THEN 'Failed'
+        WHEN run_status = 1 THEN 'Succeeded'
+        WHEN run_status = 2 THEN 'Retry'
+        WHEN run_status = 3 THEN 'Canceled'
+        ELSE 'Unknown' END AS [Run Status]
+    , message AS [Message]
+	, CASE WHEN run_status = 0 THEN '#33FF0000'
+        WHEN run_status = 2 THEN '#33FFCC00'
+        WHEN run_status = 3 THEN '#33FF8C00' END AS [__rowColor]
+FROM ctejob
+WHERE agentDateTime BETWEEN '{3}' AND '{4}'
+ORDER BY agentDateTime DESC
+    , retries_attempted DESC"
+, startTime.ToString("yyyyMMdd"), endTime.ToString("yyyyMMdd"), filterStatus, startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"));
+
+            smo.Database d = s.Databases["msdb"];
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
+
+        #endregion
     }
 }
