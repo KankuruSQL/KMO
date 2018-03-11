@@ -171,24 +171,24 @@ DROP TABLE #traceflag").Tables[0];
         public static DataTable GetLiveSession(this smo.Server s, bool WithSystemSession = false, bool WithQueryPlan = false)
         {
             smo.Database d = s.Databases["master"];
-            string _sql = @"SELECT CAST(qe.session_id AS VARCHAR) AS [Kill]
-    , CASE WHEN CAST(blocking_session_id AS VARCHAR) = '0' THEN '' ELSE CAST(blocking_session_id AS VARCHAR) END AS [Blocking_Session_Info]
+            string _sql = @"SELECT CAST(qe.session_id AS VARCHAR) AS [Session Id]
+    , CASE WHEN blocking_session_id = 0 THEN '' ELSE CAST(blocking_session_id AS VARCHAR) END AS [Blocking Session Id]
 	, s.login_name AS [Login]
-	, s.host_name AS [Host_Name]
-	, s.program_name AS [Program_Name]
-	, s.client_interface_name AS [Client_Interface_Name]
+	, s.host_name AS [Host Name]
+	, s.program_name AS [Program Name]
+	, s.client_interface_name AS [Client Interface Name]
 	, db_name(qe.Database_id) AS [Database]
-	, qe.logical_reads AS [Logical_Read]
+	, qe.logical_reads AS [Logical Read]
     , qe.writes AS [Writes]
-	, qe.cpu_time AS [CPU_Time]
+	, qe.cpu_time AS [CPU Time]
 	, DATEDIFF(MINUTE, start_time, getdate()) AS [Duration]
 	, command AS [Command]
 	, qe.status AS [Status]
-	, percent_complete AS [Percent_Complete]
-	, start_time AS [Start_Time]
-    , qe.open_transaction_count AS [Open_Transaction_Count]
+	, percent_complete AS [Percent Complete]
+	, start_time AS [Start Time]
+    , qe.open_transaction_count AS [Open Transaction Count]
     , a.text AS [Query]
-    , {0} AS [Execution_Plan]
+    {0}
 FROM sys.dm_exec_requests qe (NOLOCK)
 	INNER JOIN sys.dm_exec_sessions s (NOLOCK) on qe.session_id = s.session_id 
 	LEFT JOIN (select sqe.session_id
@@ -200,13 +200,13 @@ WHERE qe.session_id != @@SPID
 	{2}
 ORDER BY blocking_session_id DESC
 	, Duration DESC
-	, [CPU_Time] DESC";
-            string _sql0 = "''";
+	, qe.cpu_time DESC";
+            string _sql0 = "";
             string _sql1 = string.Empty;
             string _sql2 = string.Empty;
             if (WithQueryPlan)
             {
-                _sql0 = "b.query_plan";
+                _sql0 = " , b.query_plan AS [Execution Plan]";
                 _sql1 = @"	LEFT JOIN (select sqe.session_id
 					, ph.query_plan
 				FROM sys.dm_exec_requests sqe (NOLOCK)
