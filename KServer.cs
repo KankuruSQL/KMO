@@ -488,33 +488,36 @@ ORDER BY ec.client_net_address
 DECLARE @path NVARCHAR(1000)
 SELECT @path = SUBSTRING(path, 1, LEN(path) - CHARINDEX('\', REVERSE(path))) + '\log.trc'
 FROM sys.traces
-WHERE id = 1;
+WHERE is_default = 1;
 
-WITH CTE (databaseid, filename, EndTime)
-AS
-(
-	SELECT DatabaseID
-		, FileName
-		, MAX(t.EndTime) AS EndTime
-	FROM ::fn_trace_gettable(@path, default ) t
-	WHERE EventClass IN (92, 93)
-		AND DATEDIFF(hh,StartTime,GETDATE()) < 24
-	GROUP BY DatabaseID
-		, FileName
-)
-INSERT INTO #TMPLASTFILECHANGE
-(
-	databasename
-	, filename
-	, endtime
-)
-SELECT DB_NAME(database_id) AS DatabaseName
-	, mf.name AS LogicalName
-	, cte.EndTime
-FROM sys.master_files mf
-	LEFT JOIN CTE cte on mf.database_id=cte.databaseid 
-		AND mf.name=cte.filename
-WHERE cte.EndTime IS NOT NULL
+IF(@path IS NOT NULL)
+BEGIN
+    WITH CTE (databaseid, filename, EndTime)
+    AS
+    (
+	    SELECT DatabaseID
+		    , FileName
+		    , MAX(t.EndTime) AS EndTime
+	    FROM ::fn_trace_gettable(@path, default ) t
+	    WHERE EventClass IN (92, 93)
+		    AND DATEDIFF(hh,StartTime,GETDATE()) < 24
+	    GROUP BY DatabaseID
+		    , FileName
+    )
+    INSERT INTO #TMPLASTFILECHANGE
+    (
+	    databasename
+	    , filename
+	    , endtime
+    )
+    SELECT DB_NAME(database_id) AS DatabaseName
+	    , mf.name AS LogicalName
+	    , cte.EndTime
+    FROM sys.master_files mf
+	    LEFT JOIN CTE cte on mf.database_id=cte.databaseid
+		    AND mf.name=cte.filename
+    WHERE cte.EndTime IS NOT NULL
+END
 
 CREATE TABLE #TMPSPACEUSED 
 (
@@ -681,33 +684,36 @@ DROP TABLE #drives";
 DECLARE @path NVARCHAR(1000)
 SELECT @path = SUBSTRING(path, 1, LEN(path) - CHARINDEX('\', REVERSE(path))) + '\log.trc'
 FROM sys.traces
-WHERE id = 1;
+WHERE is_default = 1;
 
-WITH CTE (databaseid, filename, EndTime)
-AS
-(
-	SELECT DatabaseID
-		, FileName
-		, MAX(t.EndTime) AS EndTime
-	FROM ::fn_trace_gettable(@path, default ) t
-	WHERE EventClass IN (92, 93)
-		AND DATEDIFF(hh,StartTime,GETDATE()) < 24
-	GROUP BY DatabaseID
-		, FileName
-)
-INSERT INTO #TMPLASTFILECHANGE
-(
-	databasename
-	, filename
-	, endtime
-)
-SELECT DB_NAME(database_id) AS DatabaseName
-	, mf.name AS LogicalName
-	, cte.EndTime
-FROM sys.master_files mf
-	LEFT JOIN CTE cte on mf.database_id=cte.databaseid 
-		AND mf.name=cte.filename
-WHERE cte.EndTime IS NOT NULL
+IF(@path IS NOT NULL)
+BEGIN
+    WITH CTE (databaseid, filename, EndTime)
+    AS
+    (
+	    SELECT DatabaseID
+		    , FileName
+		    , MAX(t.EndTime) AS EndTime
+	    FROM ::fn_trace_gettable(@path, default ) t
+	    WHERE EventClass IN (92, 93)
+		    AND DATEDIFF(hh,StartTime,GETDATE()) < 24
+	    GROUP BY DatabaseID
+		    , FileName
+    )
+    INSERT INTO #TMPLASTFILECHANGE
+    (
+	    databasename
+	    , filename
+	    , endtime
+    )
+    SELECT DB_NAME(database_id) AS DatabaseName
+	    , mf.name AS LogicalName
+	    , cte.EndTime
+    FROM sys.master_files mf
+	    LEFT JOIN CTE cte on mf.database_id=cte.databaseid
+		    AND mf.name=cte.filename
+    WHERE cte.EndTime IS NOT NULL
+END
 
 CREATE TABLE #TMPSPACEUSED 
 (
@@ -1208,19 +1214,25 @@ FROM all_request_usage R1
         public static DataTable GetTempDBSortWarning(this smo.Server s)
         {
             string sql = @"DECLARE @path NVARCHAR(520)
-SELECT @path = path FROM sys.traces WHERE id = 1
-
-SELECT TOP 1000 t.StartTime AS [Start Time]
-    , v.subclass_name AS [Subclass Name]
-	, t.DatabaseName AS [Database]
-	, t.LoginName
-	, t.ApplicationName AS [Application Name]
-FROM fn_trace_gettable(@path, default) t
-	INNER JOIN sys.trace_events te ON t.EventClass = te.trace_event_id
-	INNER JOIN sys.trace_subclass_values v ON t.EventSubClass = v.subclass_value
-		AND t.EventClass = v.trace_event_id
-WHERE te.name = 'Sort Warnings'
-ORDER BY t.StartTime DESC";
+SELECT @path = path FROM sys.traces WHERE is_default = 1
+IF(@path IS NOT NULL)
+BEGIN
+    SELECT TOP 1000 t.StartTime AS [Start Time]
+        , v.subclass_name AS [Subclass Name]
+	    , t.DatabaseName AS [Database]
+	    , t.LoginName
+	    , t.ApplicationName AS [Application Name]
+    FROM fn_trace_gettable(@path, default) t
+	    INNER JOIN sys.trace_events te ON t.EventClass = te.trace_event_id
+	    INNER JOIN sys.trace_subclass_values v ON t.EventSubClass = v.subclass_value
+		    AND t.EventClass = v.trace_event_id
+    WHERE te.name = 'Sort Warnings'
+    ORDER BY t.StartTime DESC
+END
+ELSE
+BEGIN
+    SELECT 'The default trace is disabled. You should consider to activate it.'
+END";
             smo.Database d = s.Databases["tempdb"];
             return d.ExecuteWithResults(sql).Tables[0];
         }
@@ -2123,30 +2135,36 @@ WHERE group_id = '{0}'";
             string sql = string.Format(@"DECLARE @PATH NVARCHAR(1000)
 SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX('\', REVERSE(path))) + '\log.trc'
 FROM sys.traces
-WHERE id = 1;
+WHERE is_default = 1;
 
-SELECT TOP ({0}) t.StartTime AS [Start Time]
-	, t.EndTime AS [End Time]
-	, c.name AS [Category]
-	, e.name AS [Event Class]
-	, v.subclass_name AS [Sub Class]
-	, t.LoginName AS [Login]
-	, t.HostName AS [Hostname]
-	, t.ApplicationName AS [Application Name]
-	, t.DatabaseName AS [Database]
-	, t.ObjectName AS [Object]
-	, t.TextData AS [Text Data]
-FROM ::fn_trace_gettable(@PATH, default ) t
-	INNER JOIN sys.trace_events e ON t.EventClass = e.trace_event_id
-	INNER JOIN sys.trace_categories c ON e.category_id = c.category_id
-	LEFT JOIN sys.trace_subclass_values v ON t.EventSubClass = v.subclass_value AND t.EventClass = v.trace_event_id
-WHERE StartTime BETWEEN '{1}' AND '{2}'
-    AND (t.TextData IS NULL
-		OR (t.TextData NOT LIKE '%FROM ::fn_trace_gettable(@PATH, default ) t%'
-	        AND t.TextData NOT LIKE '%SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX%'))
-{3}
-ORDER BY t.StartTime DESC
-	, t.EndTime DESC"
+IF @PATH IS NOT NULL
+BEGIN
+    SELECT TOP ({0}) t.StartTime AS [Start Time]
+	    , t.EndTime AS [End Time]
+	    , c.name AS [Category]
+	    , e.name AS [Event Class]
+	    , v.subclass_name AS [Sub Class]
+	    , t.LoginName AS [Login]
+	    , t.HostName AS [Hostname]
+	    , t.ApplicationName AS [Application Name]
+	    , t.DatabaseName AS [Database]
+	    , t.ObjectName AS [Object]
+	    , t.TextData AS [Text Data]
+    FROM ::fn_trace_gettable(@PATH, default ) t
+	    INNER JOIN sys.trace_events e ON t.EventClass = e.trace_event_id
+	    INNER JOIN sys.trace_categories c ON e.category_id = c.category_id
+	    LEFT JOIN sys.trace_subclass_values v ON t.EventSubClass = v.subclass_value AND t.EventClass = v.trace_event_id
+    WHERE StartTime BETWEEN '{1}' AND '{2}'
+        AND (t.TextData IS NULL
+		    OR (t.TextData NOT LIKE '%FROM ::fn_trace_gettable(@PATH, default ) t%'
+	            AND t.TextData NOT LIKE '%SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX%'))
+    {3}
+    ORDER BY t.StartTime DESC
+	    , t.EndTime DESC
+END
+BEGIN
+    SELECT 'The default trace is disabled.' AS [Error Message]
+END"
 , topRows, startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"), categoryFilter);
 
             smo.Database d = s.Databases["master"];
@@ -2175,18 +2193,29 @@ ORDER BY name";
             string sql = string.Format(@"DECLARE @PATH NVARCHAR(1000)
 SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX('\', REVERSE(path))) + '\log.trc'
 FROM sys.traces
-WHERE id = 1;
+WHERE is_default = 1;
 
-SELECT c.name AS [Category]
-    , COUNT(*) AS [Count]
-FROM ::fn_trace_gettable(@PATH, default ) t
-	INNER JOIN sys.trace_events e ON t.EventClass = e.trace_event_id
-	INNER JOIN sys.trace_categories c ON e.category_id = c.category_id
-WHERE StartTime BETWEEN '{0}' AND '{1}'
-    AND (t.TextData IS NULL
-		OR (t.TextData NOT LIKE '%FROM ::fn_trace_gettable(@PATH, default ) t%'
-	        AND t.TextData NOT LIKE '%SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX%'))
-GROUP BY c.name"
+IF @PATH IS NOT NULL
+BEGIN
+    SELECT c.name AS [Category]
+        , COUNT(*) AS [Count]
+    FROM ::fn_trace_gettable(@PATH, default ) t
+	    INNER JOIN sys.trace_events e ON t.EventClass = e.trace_event_id
+	    INNER JOIN sys.trace_categories c ON e.category_id = c.category_id
+    WHERE StartTime BETWEEN '{0}' AND '{1}'
+        AND (t.TextData IS NULL
+		    OR (t.TextData NOT LIKE '%FROM ::fn_trace_gettable(@PATH, default ) t%'
+	            AND t.TextData NOT LIKE '%SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX%'))
+    GROUP BY c.name
+END
+ELSE
+BEGIN
+    SELECT c.name AS [Category]
+        , COUNT(*) AS [Count]
+    FROM sys.trace_categories c
+    WHERE c.category_id = -1
+    GROUP BY c.name
+END"
 , startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"));
 
             smo.Database d = s.Databases["master"];
@@ -2201,18 +2230,29 @@ GROUP BY c.name"
             string sql = string.Format(@"DECLARE @PATH NVARCHAR(1000)
 SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX('\', REVERSE(path))) + '\log.trc'
 FROM sys.traces
-WHERE id = 1;
+WHERE is_default = 1;
 
-SELECT e.name AS [Category]
-    , COUNT(*) AS [Count]
-FROM ::fn_trace_gettable(@PATH, default ) t
-	INNER JOIN sys.trace_events e ON t.EventClass = e.trace_event_id
-	INNER JOIN sys.trace_categories c ON e.category_id = c.category_id
-WHERE StartTime BETWEEN '{0}' AND '{1}'
-    AND (t.TextData IS NULL
-		OR (t.TextData NOT LIKE '%FROM ::fn_trace_gettable(@PATH, default ) t%'
-	        AND t.TextData NOT LIKE '%SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX%'))
-GROUP BY e.name"
+IF @PATH IS NOT NULL
+BEGIN
+    SELECT e.name AS [Category]
+        , COUNT(*) AS [Count]
+    FROM ::fn_trace_gettable(@PATH, default ) t
+	    INNER JOIN sys.trace_events e ON t.EventClass = e.trace_event_id
+	    INNER JOIN sys.trace_categories c ON e.category_id = c.category_id
+    WHERE StartTime BETWEEN '{0}' AND '{1}'
+        AND (t.TextData IS NULL
+		    OR (t.TextData NOT LIKE '%FROM ::fn_trace_gettable(@PATH, default ) t%'
+	            AND t.TextData NOT LIKE '%SELECT @PATH = SUBSTRING(path, 1, LEN(path) - CHARINDEX%'))
+    GROUP BY e.name
+END
+ELSE
+BEGIN
+    SELECT e.name AS [Category]
+        , COUNT(*) AS [Count]
+    FROM sys.trace_events e
+    WHERE e.trace_event_id = -1
+    GROUP BY e.name
+END"
 , startTime.ToString("yyyyMMdd HH:mm:ss"), endTime.ToString("yyyyMMdd HH:mm:ss"));
 
             smo.Database d = s.Databases["master"];
