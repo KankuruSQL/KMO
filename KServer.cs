@@ -206,7 +206,7 @@ ORDER BY blocking_session_id DESC
             string _sql2 = string.Empty;
             if (WithQueryPlan)
             {
-                _sql0 = " , b.query_plan AS [Execution Plan]";
+                _sql0 = " , b.query_plan AS [__execPlan]";
                 _sql1 = @"	LEFT JOIN (select sqe.session_id
 					, ph.query_plan
 				FROM sys.dm_exec_requests sqe (NOLOCK)
