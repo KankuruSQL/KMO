@@ -114,6 +114,9 @@ DROP TABLE #traceflag").Tables[0];
             string version;
             switch (s.VersionMajor.ToString() + "." + s.VersionMinor.ToString())
             {
+                case "15.0":
+                    version = "Sql Server 2019";
+                    break;
                 case "14.0":
                     version = "Sql Server 2017";
                     break;
