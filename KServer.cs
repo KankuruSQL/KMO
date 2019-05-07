@@ -1316,10 +1316,10 @@ DROP TABLE #TMPSPACEUSED";
         public static DataTable DashboardDisk(this smo.Server s)
         {
             smo.Database d = s.Databases["master"];
-            string sql = @"DECLARE @t table(drive VARCHAR(2), totalsize BIGINT DEFAULT 0, freespace BIGINT)
+            string sql = @"DECLARE @t table(drive VARCHAR(2), TotalSize BIGINT DEFAULT 0, freespace BIGINT)
 INSERT INTO @t(drive, freespace) EXEC xp_fixeddrives
 SELECT drive
-	, totalsize
+	, TotalSize
 	, freespace
 FROM @t";
             if (s.IsOleAutomationProcedureActivated())
@@ -1350,7 +1350,7 @@ EXEC @hr = sp_OAGetProperty @odrive,'TotalSize', @TotalSize OUT
 IF @hr <> 0
 	EXEC sp_OAGetErrorInfo @odrive
 UPDATE #drives
-SET totalsize=@TotalSize/@MB
+SET TotalSize=@TotalSize/@MB
 WHERE drive=@drive
 FETCH NEXT FROM dcur INTO @drive
 END
@@ -1360,7 +1360,7 @@ EXEC @hr=sp_OADestroy @fso
 IF @hr <> 0
 	EXEC sp_OAGetErrorInfo @fso
 SELECT drive
-	, totalsize, freespace
+	, TotalSize, freespace
 FROM #drives
 ORDER BY drive
 DROP TABLE #drives";
