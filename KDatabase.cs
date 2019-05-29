@@ -91,6 +91,28 @@ END", startDate.ToString("yyyyMMdd hh:mm:ss"), endDate.ToString("yyyyMMdd hh:mm:
         }
 
         /// <summary>
+        /// Get transactions opened for each replicated databases
+        /// Must be executed on distribution db
+        /// </summary>
+        /// <param name="d">Your smo database (distribution)</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetReplicationTransactionsByDatabase(this smo.Database d)
+        {
+            DataTable dt = new DataTable();
+            if (d.IsDistributor())
+            {
+                string sql = @"SELECT d.publisher_db AS [Database]
+	, COUNT(*) AS [Transactions Count]
+FROM MSrepl_transactions t
+	INNER JOIN MSpublisher_databases d ON t.publisher_database_id = d.id
+GROUP BY d.publisher_db
+ORDER BY [Transactions Count] DESC";
+                dt = d.ExecuteWithResults(sql).Tables[0];
+            }
+            return dt;
+        }
+
+        /// <summary>
         /// get error from distribution
         /// </summary>
         /// <param name="d">your smo distribution database</param>
