@@ -113,6 +113,38 @@ ORDER BY [Transactions Count] DESC";
         }
 
         /// <summary>
+        /// Get commands count by article
+        /// Must be executed on distribution db
+        /// </summary>
+        /// <param name="d">Your smo database (distribution)</param>
+        /// <returns>a datatable</returns>
+        public static DataTable GetReplicationCommandsByArticle(this smo.Database d)
+        {
+            DataTable dt = new DataTable();
+            if (d.IsDistributor())
+            {
+                string sql = @"SELECT s.name AS [Subscriber]
+	, sub.publisher_db AS [Database]
+	, a.article AS [Article]
+	, COUNT(*) AS [Commands Count]
+FROM dbo.MSrepl_commands c (NOLOCK)
+	INNER JOIN dbo.MSsubscriptions sub (NOLOCK) ON c.publisher_database_id = sub.publisher_database_id
+        AND c.article_id = sub.article_id
+	INNER JOIN dbo.MSarticles a (NOLOCK) ON sub.publisher_id = a.publisher_id
+        AND sub.publication_id = a.publication_id
+        AND sub.article_id = a.article_id
+	INNER JOIN sys.servers s ON sub.subscriber_id = s.server_id
+GROUP BY s.name
+	, sub.publisher_db
+	, a.article
+ORDER BY [Commands Count] DESC
+    , [Subscriber]";
+                dt = d.ExecuteWithResults(sql).Tables[0];
+            }
+            return dt;
+        }
+
+        /// <summary>
         /// get error from distribution
         /// </summary>
         /// <param name="d">your smo distribution database</param>
