@@ -118,7 +118,7 @@ ORDER BY [Transactions Count] DESC";
         /// </summary>
         /// <param name="d">Your smo database (distribution)</param>
         /// <returns>a datatable</returns>
-        public static DataTable GetReplicationCommandsByArticle(this smo.Database d, string subscriber)
+        public static DataTable GetReplicationCommandsByArticle(this smo.Database d, string subscriber, string database)
         {
             DataTable dt = new DataTable();
             if (d.IsDistributor())
@@ -135,11 +135,12 @@ FROM dbo.MSrepl_commands c (NOLOCK)
         AND sub.article_id = a.article_id
 	INNER JOIN sys.servers s ON sub.subscriber_id = s.server_id
 WHERE s.name = '{0}'
+    AND sub.publisher_db = '{1}'
 GROUP BY s.name
 	, sub.publisher_db
 	, a.article
 ORDER BY [Commands Count] DESC
-    , [Subscriber]", subscriber);
+    , [Subscriber]", subscriber, database);
                 dt = d.ExecuteWithResults(sql).Tables[0];
             }
             return dt;
