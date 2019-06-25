@@ -966,9 +966,16 @@ ORDER BY wait_type", sqlIgnore);
     , ProcessInfo NVARCHAR(50)
     ,vchMessage NVARCHAR(2000)
 )
-
-INSERT INTO #KMOErrorLog(LogDate, ProcessInfo, vchMessage)
-EXEC master.dbo.xp_readerrorlog {0}
+CREATE TABLE #err_log_tmp(ArchiveNo int, CreateDate nvarchar(44), Size int)
+INSERT INTO #err_log_tmp EXEC master.dbo.sp_enumerrorlogs
+IF(SELECT COUNT(*) AS FileExists
+FROM #err_log_tmp
+WHERE ArchiveNo = {0}) = 1
+BEGIN
+    INSERT INTO #KMOErrorLog(LogDate, ProcessInfo, vchMessage)
+    EXEC master.dbo.xp_readerrorlog {0}
+END
+DROP TABLE #err_log_tmp
 
 DELETE FROM #KMOErrorLog 
 WHERE LogDate < '{1}'
@@ -987,14 +994,15 @@ WHERE vchMessage LIKE '%This is an informational message%'
     OR vchMessage LIKE '%Ce message est fourni à titre d''information. Aucune action n''est requise de la part de l''utilisateur.%' ";
             }
 
-            sql += @" SELECT LogDate
+            sql += string.Format(@" SELECT LogDate
+    , {0} AS [Log File]
     , ProcessInfo
     , RTRIM(LTRIM(vchMessage)) AS [Message]
 FROM #KMOErrorLog
 ORDER BY LogDate DESC
 
 DROP TABLE #KMOErrorLog
-";
+", logFileNumber);
 
             smo.Database d = s.Databases["master"];
             return d.ExecuteWithResults(sql).Tables[0];
@@ -1017,10 +1025,19 @@ DROP TABLE #KMOErrorLog
     , vchMessage NVARCHAR(2000)
 )
 
-INSERT INTO #KMOLoginFailed(LogDate, ProcessInfo, vchMessage)
-EXEC master.dbo.xp_readerrorlog {0}
+CREATE TABLE #err_log_tmp(ArchiveNo int, CreateDate nvarchar(44), Size int)
+INSERT INTO #err_log_tmp EXEC master.dbo.sp_enumerrorlogs
+IF(SELECT COUNT(*) AS FileExists
+FROM #err_log_tmp
+WHERE ArchiveNo = {0}) = 1
+BEGIN
+    INSERT INTO #KMOLoginFailed(LogDate, ProcessInfo, vchMessage)
+    EXEC master.dbo.xp_readerrorlog {0}
+END
+DROP TABLE #err_log_tmp
 
 SELECT LogDate
+    , {0} AS [Log File]
     , ProcessInfo
 	, RTRIM(LTRIM(vchMessage)) AS [Message]
 FROM #KMOLoginFailed
