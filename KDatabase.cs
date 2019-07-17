@@ -35,27 +35,27 @@ namespace KMO
             {
                 string sql = @"SELECT SUM(ds.UndelivCmdsInDistDB) AS [Undelivered]
     , SUM(ds.DelivCmdsInDistDB) AS [Delivered]
-    , ss.name AS [Subscriber]
-    , sp.name AS [Publisher]
+    , ss.srvname AS [Subscriber]
+    , sp.srvname AS [Publisher]
     , da.publication AS [Publication]
     , da.publisher_db AS [Database]
     , da.name AS [Agent]
 FROM dbo.MSdistribution_agents da WITH (READUNCOMMITTED)
-    INNER JOIN sys.servers sp WITH (READUNCOMMITTED)
-        ON sp.server_id = da.publisher_id
-    INNER JOIN sys.servers ss WITH (READUNCOMMITTED)
-        ON ss.server_id = da.subscriber_id
+    INNER JOIN [dbo].[MSreplservers] sp WITH (READUNCOMMITTED)
+        ON sp.srvid = da.publisher_id
+    INNER JOIN [dbo].[MSreplservers] ss WITH (READUNCOMMITTED)
+        ON ss.srvid = da.subscriber_id
     INNER JOIN dbo.MSdistribution_status ds WITH (READUNCOMMITTED)
         ON ds.agent_id = da.id
 GROUP BY
-    sp.name
-    , ss.name
+    sp.srvname
+    , ss.srvname
     , da.name
     , da.id
     , da.publication
     , da.publisher_db
 ORDER BY undelivered DESC
-	, delivered DESC";
+    , delivered DESC";
                 dt = d.ExecuteWithResults(sql).Tables[0];
             }
             return dt;
