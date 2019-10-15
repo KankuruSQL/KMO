@@ -941,6 +941,75 @@ ORDER BY wait_type", sqlIgnore);
             }
             return dt;
         }
+
+        /// <summary>
+        /// Get lock statistics for an instance. Used in Live Lock Profiler
+        /// </summary>
+        /// <param name="s">your smo server</param>
+        /// <returns>return the result of the query in a DataTable</returns>
+        public static DataTable GetLiveLockProfiler(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @";WITH cte AS
+(
+    SELECT CAST(qe.session_id AS VARCHAR) AS [Session_Id]
+        , blocking_session_id
+        , db_name(qe.Database_id) AS [DatabaseName]
+        , s.login_name
+        , s.host_name
+        , s.program_name
+        , s.client_interface_name
+        , start_time
+		, qe.logical_reads
+		, qe.writes
+		, qe.cpu_time
+        , qe.command
+        , a.text AS [Query]
+    FROM sys.dm_exec_requests qe (NOLOCK)
+        INNER JOIN sys.dm_exec_sessions s (NOLOCK) on qe.session_id = s.session_id 
+        LEFT JOIN (select sqe.session_id
+                        , st.text
+                    FROM sys.dm_exec_requests sqe (NOLOCK)
+                        CROSS APPLY sys.dm_exec_sql_text(sqe.sql_handle) st) a ON qe.session_id = a.session_id
+    WHERE qe.session_id != @@SPID
+)
+SELECT c.Session_Id
+    , c.DatabaseName
+    , c.login_name
+    , c.host_name
+    , c.program_name
+    , c.client_interface_name
+    , c.command
+    , c.Start_Time
+	, c.cpu_time
+	, c.logical_reads
+	, c.writes
+    , c.Query
+	, c.blocking_session_id
+	, c2.blocking_session_id AS blocking_session_id_Lvl2
+	, db_name(s.dbid) AS blocking_DatabaseName
+	, s.loginame as blocking_loginname
+	, s.hostname as blocking_hostname
+	, s.program_name as blocking_program_name
+	, c2.client_interface_name as blocking_client_interface_name
+	, c2.start_time AS blocking_start_time
+	, coalesce(c2.query, text2.text) AS blocking_Query
+    , s.cpu AS blocking_cpu
+	, s.cmd AS blocking_command
+FROM cte c
+    LEFT JOIN cte c2 on c.blocking_session_id = c2.Session_Id
+    LEFT JOIN master.sys.sysprocesses s on c.blocking_session_id = s.spid
+	LEFT JOIN(
+		SELECT s2.spid
+			, st2.text
+		FROM master.sys.sysprocesses s2
+			CROSS APPLY sys.dm_exec_sql_text(s2.sql_handle) st2
+	) AS text2 ON s.spid = text2.spid
+WHERE c.blocking_session_id != 0";
+            DataTable dt = d.ExecuteWithResults(sql).Tables[0];
+            return dt;
+        }
+
         #endregion
 
         #region ErrorLogs
