@@ -308,6 +308,7 @@ GROUP BY database_id
     , SUM(total_worker_time) AS [Cpu]
     , SUM(total_elapsed_time) AS [Elapsed Time]
     , SUM(execution_count) AS [Execution Count]
+    , MIN(qs.execution_count) AS [Unique Execution Count]
     , SUM(total_logical_reads) AS [Logical Reads]
     , SUM(total_physical_reads) AS [Physical Reads]
     , SUM(total_logical_writes) AS [Logical Writes]
