@@ -190,6 +190,14 @@ DROP TABLE #traceflag").Tables[0];
 	, percent_complete AS [Percent Complete]
 	, start_time AS [Start Time]
     , qe.open_transaction_count AS [Open Transaction Count]
+    , qe.row_count AS [Row Count]
+    , CASE qe.transaction_isolation_level
+        WHEN 1 THEN 'ReadUncomitted'
+        WHEN 2 THEN 'ReadCommitted'
+        WHEN 3 THEN 'Repeatable'
+        WHEN 4 THEN 'Serializable'
+        WHEN 5 THEN 'Snapshot'
+        ELSE 'Unknown' END AS [Transaction Isolation Level]
     , a.text AS [Query]
     {0}
 FROM sys.dm_exec_requests qe (NOLOCK)
