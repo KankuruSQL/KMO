@@ -842,6 +842,18 @@ FROM cte
 ORDER BY EventTime DESC";
             return d.ExecuteWithResults(sql).Tables[0];
         }
+
+        /// <summary>
+        /// Returns the list of windows process. Not yet tested on linux
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
+        public static DataTable GetProcessCPU(this smo.Server s)
+        {
+            smo.Database d = s.Databases["master"];
+            string sql = @"EXEC xp_cmdshell 'powershell ""get-process | Select-Object ProcessName, CPU""'";
+            return d.ExecuteWithResults(sql).Tables[0];
+        }
         #endregion
 
         #region Memory
