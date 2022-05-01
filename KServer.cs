@@ -551,8 +551,8 @@ EXEC('sp_MSforeachdb''use [?]; Select ''''?'''' AS DBName
 SELECT a.name AS DatabaseName
 	, b.name AS FileName
 	, CASE b.type WHEN 0 THEN 'DATA' ELSE b.type_desc END AS FileType
-	, CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) AS FileSize
-	, CAST((b.size * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) / CAST((b.size * 8 / 1024.0) AS DECIMAL(18,2)) * 100 AS FreeSpace
+	, CAST((CONVERT(BigInt,b.size) * 8 / 1024.0) AS DECIMAL(18,2)) AS FileSize
+	, CAST((CONVERT(BigInt,b.size) * 8 / 1024.0) - (d.SPACEUSED / 128.0) AS DECIMAL(15,2)) / CAST((CONVERT(BigInt,b.size) * 8 / 1024.0) AS DECIMAL(18,2)) * 100 AS FreeSpace
 	, b.physical_name
 	, datediff(DAY, c.endtime, GETDATE()) AS LastGrowth
 FROM sys.databases a
